@@ -123,6 +123,7 @@ elif "game" in args:
             sourcefn = os.path.join(PKGDIR, pkg)
             newfn = os.path.join("backup_pkgs", pkg)
             shutil.copy(sourcefn, newfn)
+            shutil.copy(sourcefn.split(".pkg")[0]+".hed", newfn.split(".pkg")[0]+".hed")
     if restore:
         print("Restoring from backup")
         if not os.path.exists("backup_pkgs"):
@@ -131,6 +132,7 @@ elif "game" in args:
             newfn = os.path.join(PKGDIR, pkg)
             sourcefn = os.path.join("backup_pkgs", pkg)
             shutil.copy(sourcefn, newfn)
+            shutil.copy(sourcefn.split(".pkg")[0]+".hed", newfn.split(".pkg")[0]+".hed")
     if patch:
         print("Patching")
         if os.path.exists("khbuild"):
@@ -173,6 +175,7 @@ elif "game" in args:
                 print(output.decode('utf-8'))
                 raise Exception("Patch failed")
             shutil.copy(os.path.join("pkgoutput", pkg+".pkg"), os.path.join(PKGDIR, pkg+".pkg"))
+            shutil.copy(os.path.join("pkgoutput", pkg+".hed"), os.path.join(PKGDIR, pkg+".hed"))
         if not keepkhbuild:
             shutil.rmtree("khbuild")
     print("All done! Took {}s".format(time.time()-starttime))
