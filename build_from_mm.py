@@ -70,6 +70,7 @@ PKGDIR = os.environ["USE_KH_PKG_DIR"]
 IDXDIR = os.getcwd() if not "USE_OPENKH_IDX_DIR" in os.environ else os.environ["USE_OPENKH_IDX_DIR"]
 IDXPATH = os.path.join(IDXDIR, "OpenKh.Command.IdxImg.exe")
 DEFAULTREGION = "us"
+DEFAULTGAME = "kh2"
 
 @Gooey
 def main():
@@ -77,17 +78,20 @@ def main():
 
     parser = argparse.ArgumentParser()
 
-    parser.add_argument(dest="game", choices=list(games.keys()), help="should be 'kh1' or 'kh2' or 'bbs' or 'recom'")
-
-    parser.add_argument("-patch", action="store_true", default=False, help="patch the games files with the contents of the mods manager 'mod' directory")
-    parser.add_argument("-backup", action="store_true", default=False, help="will backup the games PKG files to a new folder in this directory called 'backup_pkgs' (warning, can take a lot of space)")
-    parser.add_argument("-restore", action="store_true", default=False, help="will restore the games pkg files before applying the patch, using the pkgs found in 'backup_pkgs'")
-
-    parser.add_argument("-keepkhbuild", action="store_true", default=False, help="will keep the intermediate khbuild folder from being deleted after the patch is applied")
+    parser.add_argument("-game", choices=list(games.keys()), default=DEFAULTGAME, help="Which game to operate on", required=True)
 
     parser.add_argument("-region", choices=["jp", "us", "uk", "it", "sp", "gr", "fr"], default=DEFAULTREGION, help="defaults to 'us', needed to make sure the correct files are patched, as KH2FM PS2 mods use 'jp' as the region")
 
-    parser.add_argument('-ignoremissing', type=int, default=1, help="defaults to true. If true, prints a warning when a file can't be patched, rather than failing")
+    parser.add_argument("-restore", action="store_true", default=True, help="Will restore the games pkg files before applying the patch, using the pkgs found in 'backup_pkgs'")
+    parser.add_argument("-patch", action="store_true", default=True, help="Patch the games files with the contents of the Mods Manager 'mod' directory")
+
+    parser.add_argument("-backup", action="store_true", default=False, help="Will backup the games PKG files to a new folder in this directory called 'backup_pkgs' (warning, can take a lot of space)")
+    parser.add_argument("-extract", action="store_true", default=False, help="Will extract the games PKG files to be used by Mods Manger")
+
+
+    parser.add_argument("-keepkhbuild", action="store_true", default=False, help="Will keep the intermediate khbuild folder from being deleted after the patch is applied")
+
+    parser.add_argument('-ignoremissing', type=int, default=1, help="If true, prints a warning when a file can't be patched, rather than failing")
 
     # Parse and print the results
     args = parser.parse_args()
