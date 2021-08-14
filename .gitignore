@@ -8,3 +8,4 @@ build
 khbuild
 extractedout
 *.pycache
+config.json
