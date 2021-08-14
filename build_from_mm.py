@@ -151,7 +151,7 @@ def main():
         print("Extracting {}".format(game.name))
         if not os.path.exists(args.extracted_games_path):
             raise Exception("Path does not exist to extract games to! {}".format(args.extracted_games_path))
-        pkglist = [os.path.join(PKGDIR,p) for p in os.listdir(PKGDIR) if game.name in p and p.endswith(".pkg")]
+        pkglist = [os.path.join(PKGDIR,p) for p in os.listdir(PKGDIR) if game.name in p and p.endswith(".hed")]
         if os.path.exists("extractedout"):
             shutil.rmtree("extractedout")
         os.makedirs("extractedout")
@@ -165,12 +165,14 @@ def main():
             try:
                 output = subprocess.check_output(args, stderr=subprocess.STDOUT)
                 print(output)
-                original_path = os.path.join("extractedout")
-                for root, dirs, files in os.walk(os.path.join)
             except subprocess.CalledProcessError as err:
                 output = err.output
                 print(output.decode('utf-8'))
                 raise Exception("Extract failed")
+        original_path = os.path.join("extractedout", "original")
+        remastered_path = os.path.join("extractedout", "remastered")
+        shutil.move(remastered_path, os.path.join(original_path, "remastered"))
+        shutil.move(original_path, EXTRACTED_GAME_PATH)
     if backup:
         print("Backing up")
         if not os.path.exists("backup_pkgs"):
