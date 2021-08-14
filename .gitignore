@@ -2,3 +2,9 @@ extracted_pkgs
 backup_pkgs
 khbuild
 pkgoutput
+dist
+*.spec
+build
+khbuild
+extractedout
+*.pycache

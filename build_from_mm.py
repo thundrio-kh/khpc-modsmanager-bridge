@@ -1,5 +1,5 @@
 import sys, os, shutil, subprocess, json, time, argparse
-from gooey import Gooey
+from gooey import Gooey, GooeyParser
 
 
 class KingdomHearts1Patcher:
@@ -64,11 +64,6 @@ games = {
     "kh3d": KingdomHearts3DPatcher,
     "Recom": RecomPatcher
 }
-
-MODDIR = os.environ["USE_OPENKH_MODS_DIR"]
-PKGDIR = os.environ["USE_KH_PKG_DIR"]
-IDXDIR = os.getcwd() if not "USE_OPENKH_IDX_DIR" in os.environ else os.environ["USE_OPENKH_IDX_DIR"]
-IDXPATH = os.path.join(IDXDIR, "OpenKh.Command.IdxImg.exe")
 DEFAULTREGION = "us"
 DEFAULTGAME = "kh2"
 
@@ -76,11 +71,25 @@ DEFAULTGAME = "kh2"
 def main():
     starttime = time.time()
 
-    parser = argparse.ArgumentParser()
+    default_config = {
+        "game": DEFAULTGAME,
+        "openkh_path": "",
+        "extracted_games_path": "",
+        "khgame_path": "",
+        "region": DEFAULTREGION
+    }
+    if os.path.exists("config.json"):
+        default_config = json.load(open("config.json"))
 
-    parser.add_argument("-game", choices=list(games.keys()), default=DEFAULTGAME, help="Which game to operate on", required=True)
+    parser = GooeyParser()
 
-    parser.add_argument("-region", choices=["jp", "us", "uk", "it", "sp", "gr", "fr"], default=DEFAULTREGION, help="defaults to 'us', needed to make sure the correct files are patched, as KH2FM PS2 mods use 'jp' as the region")
+    parser.add_argument("-game", choices=list(games.keys()), default=default_config.get("game"), help="Which game to operate on", required=True)
+
+    parser.add_argument("-openkh_path", help="Path to openKH folder", default=default_config.get("openkh_path"), widget='DirChooser')
+    parser.add_argument("-extracted_games_path", help="Path to folder containing extracted games", default=default_config.get("extracted_games_path"), widget='DirChooser')
+    parser.add_argument("-khgame_path", help="Path to the kh_1.5_2.5 folder", default=default_config.get("khgame_path"), widget='DirChooser')
+
+    parser.add_argument("-region", choices=["jp", "us", "uk", "it", "sp", "gr", "fr"], default=default_config.get("region", ""), help="defaults to 'us', needed to make sure the correct files are patched, as KH2FM PS2 mods use 'jp' as the region")
 
     parser.add_argument("-restore", action="store_true", default=True, help="Will restore the games pkg files before applying the patch, using the pkgs found in 'backup_pkgs'")
     parser.add_argument("-patch", action="store_true", default=True, help="Patch the games files with the contents of the Mods Manager 'mod' directory")
@@ -96,7 +105,23 @@ def main():
     # Parse and print the results
     args = parser.parse_args()
 
-    game = args.game
+    config_to_write = {
+        "game": args.game,
+        "openkh_path": args.openkh_path,
+        "extracted_games_path": args.extracted_games_path,
+        "khgame_path": args.khgame_path,
+        "region": args.region
+    }
+
+    json.dump(config_to_write, open("config.json", "w"))
+
+    MODDIR = os.path.join(args.openkh_path, "mod")
+    PKGDIR = os.path.join(args.khgame_path, "Image", "en")
+    IDXDIR =args.openkh_path
+    IDXPATH = os.path.join(IDXDIR, "OpenKh.Command.IdxImg.exe")
+
+
+    gamename = args.game
     if not args.game in games:
         raise Exception("Game not found, possible options: {}".format(list(games.keys())))
     if not os.path.exists(MODDIR):
@@ -106,13 +131,46 @@ def main():
     if not os.path.exists(IDXPATH):
         raise Exception("OpenKh.Command.IdxImg.exe not found")
     region = args.region
-    game = games[args.game](region=region)
+    game = games[gamename](region=region)
     patch = args.patch
     backup = args.backup
+    extract = args.extract
     restore = args.restore
     keepkhbuild = args.keepkhbuild
     ignoremissing = args.ignoremissing
+
+    print("CONFIG TO RUN")
+    print("patch", patch)
+    print("backup", backup)
+    print("extract", args.extract)
+    print("restore", args.restore)
+    print("keepkhbuild", args.keepkhbuild)
+    print("ignoremissing", args.ignoremissing)
     pkgmap = json.load(open("pkgmap.json")).get(game.name)
+    if extract:
+        print("Extracting {}".format(game.name))
+        if not os.path.exists(args.extracted_games_path):
+            raise Exception("Path does not exist to extract games to! {}".format(args.extracted_games_path))
+        pkglist = [os.path.join(PKGDIR,p) for p in os.listdir(PKGDIR) if game.name in p and p.endswith(".pkg")]
+        if os.path.exists("extractedout"):
+            shutil.rmtree("extractedout")
+        os.makedirs("extractedout")
+        EXTRACTED_GAME_PATH = os.path.join(args.extracted_games_path, game.name)
+        if os.path.exists(EXTRACTED_GAME_PATH):
+            shutil.rmtree(EXTRACTED_GAME_PATH)
+        os.makedirs(EXTRACTED_GAME_PATH)
+        for pkgfile in pkglist:
+            args = [IDXPATH, "hed", "extract", pkgfile, "-o", "extractedout"]
+            print(IDXPATH, "hed", "extract", '"{}"'.format(pkgfile), "-o", '"{}"'.format("extractedout"))
+            try:
+                output = subprocess.check_output(args, stderr=subprocess.STDOUT)
+                print(output)
+                original_path = os.path.join("extractedout")
+                for root, dirs, files in os.walk(os.path.join)
+            except subprocess.CalledProcessError as err:
+                output = err.output
+                print(output.decode('utf-8'))
+                raise Exception("Extract failed")
     if backup:
         print("Backing up")
         if not os.path.exists("backup_pkgs"):
@@ -164,8 +222,9 @@ def main():
                 shutil.rmtree("pkgoutput")
             print("Patching: {}".format(pkg))
             args = [IDXPATH, "hed", "patch", pkgfile, modfolder, "-o", "pkgoutput"]
-            print(IDXPATH, "hed", "patch", '"{}"'.format(pkgfile), '"modfolder"', "-o", '"{}"'.format("pkgoutput"))
+            #print(IDXPATH, "hed", "patch", '"{}"'.format(pkgfile), '"modfolder"', "-o", '"{}"'.format("pkgoutput"))
             try:
+                print(args)
                 output = subprocess.check_output(args, stderr=subprocess.STDOUT)
                 print(output)
             except subprocess.CalledProcessError as err:
