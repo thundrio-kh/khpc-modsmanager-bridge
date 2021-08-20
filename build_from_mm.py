@@ -140,7 +140,7 @@ def main():
     ignoremissing = args.ignoremissing
 
     print("CONFIG TO RUN")
-    print("patch", patch)
+    print("patch", type(patch), patch)
     print("backup", backup)
     print("extract", args.extract)
     print("restore", args.restore)
