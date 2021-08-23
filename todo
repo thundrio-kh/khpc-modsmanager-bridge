@@ -1,12 +1,5 @@
-options need to actually work
-backups based on checksums
-optional browse to folder of .kh2pcpatch scripts that are installed in alphabetical order, with the "mod" folder being installed last
-better instructions???? Get someone to try it out and
-
 generator needs music to get finished, and instructions for various things put to the site (daily seeds, music, khpc mods manager bridge)
 
-figure out why stt is crashing on pc, come up with fix
-khbr stuff should be optionally applied, hopefully completing the refactor (make sure cups bosses always off on pc)
-    with the options like mix ranged/size/hard only/?ps2 memory levels?
+khbr stuff should be optionally applied to the pc version
 
 then I need to handle panacea

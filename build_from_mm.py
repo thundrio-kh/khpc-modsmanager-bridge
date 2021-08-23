@@ -1,6 +1,6 @@
 import sys, os, shutil, subprocess, json, time, argparse
 from gooey import Gooey, GooeyParser
-
+from zipfile import ZipFile
 
 class KingdomHearts1Patcher:
     def __init__(self, region):
@@ -50,7 +50,7 @@ class KingdomHearts3DPatcher:
 class RecomPatcher:
     def __init__(self, region):
         self.region = region
-        self.name = "Recom"
+        self.name = "recom"
         self.pkgs = ["Recom.pkg"]
     def translate_path(self, path):
         if path.startswith(os.sep):
@@ -67,17 +67,32 @@ games = {
 DEFAULTREGION = "us"
 DEFAULTGAME = "kh2"
 
-checksums = {
-
+checksums = {'bbs_first.pkg': 'c7623c0459d0b9bb7ba77e966f9d26bc',
+ 'bbs_fourth.pkg': 'c61f61dd5954d795c03ae17174c15944',
+ 'bbs_second.pkg': 'a45d032ac2e39637d4cdf54c67b58d1b',
+ 'bbs_third.pkg': '1eb46d47c521b4b7f127e3e71428cfa0',
+ 'kh1_fifth.pkg': 'c5527403cf2b8340bf943e916a2971bc',
+ 'kh1_first.pkg': '188acf5c53948e0dbfaf4d3a1b3a88c4',
+ 'kh1_fourth.pkg': '00830acd3599236b378208132dbbd538',
+ 'kh1_second.pkg': '7eb1206e1568448924fd9d7785f618ea',
+ 'kh1_third.pkg': '2489bdf1e8dbaddd2177bd35d9a4eefd',
+ 'kh2_fifth.pkg': '94ac4ced450ca269e95cc8f2769131cd',
+ 'kh2_first.pkg': 'b977794bb340dc6c7fad486940af48a4',
+ 'kh2_fourth.pkg': 'd0b7b1417ffc4cc7cec75a878b115adb',
+ 'kh2_second.pkg': '832454c68a676022c106364c30601927',
+ 'kh2_sixth.pkg': 'b9c31aa7a3296b9b62d875787baf757f',
+ 'kh2_third.pkg': '55ce51115dd0587deb504f57b34d1c6e',
+ 'Recom.pkg': 'f05f21634ad3f14d1943abc16bb06183',
+ 'Theater.pkg': '1e08718a47d4aa0776931606e8fc9450'
 }
 
 import hashlib 
 
 def validChecksum(path):
     pkgname = path.split(os.sep)[-1]
-    if pkgname not in checksum:
+    if pkgname not in checksums:
         raise Exception("Error: PKG {} not found!".format(pkgname))
-    checksum = hashlib.sha512(open(path,'rb').read()).hexdigest()
+    checksum = hashlib.md5(open(path,'rb').read()).hexdigest()
     if not checksum == checksums[pkgname]:
         print("PKG {} has changed checksum!".format(pkgname))
         return False
@@ -116,7 +131,7 @@ def main():
     main_options.add_argument("-openkh_path", help="Path to openKH folder", default=default_config.get("openkh_path"), widget='DirChooser')
     main_options.add_argument("-extracted_games_path", help="Path to folder containing extracted games", default=default_config.get("extracted_games_path"), widget='DirChooser')
     main_options.add_argument("-khgame_path", help="Path to the kh_1.5_2.5 folder", default=default_config.get("khgame_path"), widget='DirChooser')
-    main_options.add_argument("-patches_path", help="Path to directory containing other patches to apply. Will be applied in alphabetical order (with the mods manager 'mod' directory applied last). (optional)", default=default_config.get("khgame_path"), widget='DirChooser')
+    main_options.add_argument("-patches_path", help="Path to directory containing other patches to apply. Will be applied in alphabetical order (with the mods manager 'mod' directory applied last). (optional)", default=default_config.get("patches_path"), widget='DirChooser')
 
 
     advanced_options = parser.add_argument_group(
@@ -135,7 +150,8 @@ def main():
         "openkh_path": args.openkh_path,
         "extracted_games_path": args.extracted_games_path,
         "khgame_path": args.khgame_path,
-        "region": args.region
+        "region": args.region,
+        "patches_path": args.patches_path
     }
 
     json.dump(config_to_write, open("config.json", "w"))
@@ -182,14 +198,13 @@ def main():
         EXTRACTED_GAME_PATH = os.path.join(args.extracted_games_path, game.name)
         if os.path.exists(EXTRACTED_GAME_PATH):
             shutil.rmtree(EXTRACTED_GAME_PATH)
-        os.makedirs(EXTRACTED_GAME_PATH)
         for pkgfile in pkglist:
-            if not validChecksum(pkgfile) and validate_checksum:
+            if not validChecksum(pkgfile[:-4]+".pkg") and validate_checksum:
                 raise Exception("Error: {} has an invalid checksum, please restore the original file!".format(pkgfile))
-            args = [IDXPATH, "hed", "extract", pkgfile, "-o", "extractedout"]
+            idx_args = [IDXPATH, "hed", "extract", pkgfile, "-o", "extractedout"]
             print(IDXPATH, "hed", "extract", '"{}"'.format(pkgfile), "-o", '"{}"'.format("extractedout"))
             try:
-                output = subprocess.check_output(args, stderr=subprocess.STDOUT)
+                output = subprocess.check_output(idx_args, stderr=subprocess.STDOUT)
                 print(output)
             except subprocess.CalledProcessError as err:
                 output = err.output
@@ -198,7 +213,8 @@ def main():
         original_path = os.path.join("extractedout", "original")
         remastered_path = os.path.join("extractedout", "remastered")
         shutil.move(remastered_path, os.path.join(original_path, "remastered"))
-        shutil.move(original_path, EXTRACTED_GAME_PATH)
+        shutil.move(original_path, args.extracted_games_path)
+        os.rename(os.path.join(args.extracted_games_path, "original"), EXTRACTED_GAME_PATH)
     if backup:
         print("Backing up")
         if not os.path.exists("backup_pkgs"):
@@ -218,8 +234,9 @@ def main():
         for pkg in game.pkgs:
             newfn = os.path.join(PKGDIR, pkg)
             sourcefn = os.path.join("backup_pkgs", pkg)
-            if not validChecksum(sourcefn) and validate_checksum:
-                raise Exception("Error: {} has an invalid checksum, please restore the original file and try again".format(sourcefn))
+            # The md5 takes too long to check so don't do it when restoring
+            # if not validChecksum(sourcefn) and validate_checksum:
+            #     raise Exception("Error: {} has an invalid checksum, please restore the original file and try again".format(sourcefn))
             shutil.copy(sourcefn, newfn)
             shutil.copy(sourcefn.split(".pkg")[0]+".hed", newfn.split(".pkg")[0]+".hed")
     if patch:
@@ -248,7 +265,7 @@ def main():
                     shutil.copy(fn, newfn)
         other_patches = []
         if os.path.exists(extra_patches_dir):
-            other_patches = [p for p in os.listdir(extra_patches_dir) if p.endswith(".kh2pcpatch")] #TODO double check extension
+            other_patches = [os.path.join(extra_patches_dir,p) for p in os.listdir(extra_patches_dir) if p.endswith(".kh2pcpatch")] #TODO double check extension
         zipped_files = {}
         for patch in sorted(other_patches):
             # Read the patch in as a zip, or extract it out to some temp dir
@@ -256,11 +273,15 @@ def main():
             input_zip=ZipFile(patch)
             for name in input_zip.namelist():
                 zipped_files[name] = input_zip.read(name)
-            zipped_files = {name: input_zip.read(name) for name in input_zip.namelist()}
         for fn in zipped_files:
+            if len(zipped_files[fn]) == 0:
+                continue
             newfn = os.path.join("khbuild", fn)
             # mods manager needs to take priority
-            if not os.path.exists(fn): 
+            if not os.path.exists(newfn): 
+                new_basedir = os.path.dirname(newfn)
+                if not os.path.exists(new_basedir):
+                    os.makedirs(new_basedir)
                 open(newfn, "wb").write(zipped_files[fn])
         for pkg in os.listdir("khbuild"):
             pkgfile = os.path.join(PKGDIR, pkg+".pkg")
