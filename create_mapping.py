@@ -2,6 +2,8 @@ import json, os
 
 x = {}
 
+x_r = {}
+
 for root, dirs, files in os.walk("extracted_pkgs"):
     if "remastered" in root:
         continue

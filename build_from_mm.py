@@ -67,6 +67,22 @@ games = {
 DEFAULTREGION = "us"
 DEFAULTGAME = "kh2"
 
+checksums = {
+
+}
+
+import hashlib 
+
+def validChecksum(path):
+    pkgname = path.split(os.sep)[-1]
+    if pkgname not in checksum:
+        raise Exception("Error: PKG {} not found!".format(pkgname))
+    checksum = hashlib.sha512(open(path,'rb').read()).hexdigest()
+    if not checksum == checksums[pkgname]:
+        print("PKG {} has changed checksum!".format(pkgname))
+        return False
+    return True
+
 @Gooey
 def main():
     starttime = time.time()
@@ -83,24 +99,33 @@ def main():
 
     parser = GooeyParser()
 
-    parser.add_argument("-game", choices=list(games.keys()), default=default_config.get("game"), help="Which game to operate on", required=True)
+    main_options = parser.add_argument_group(
+        "Main options",
+        "The main options around the mode and game to use. All required"
+    )
 
-    parser.add_argument("-openkh_path", help="Path to openKH folder", default=default_config.get("openkh_path"), widget='DirChooser')
-    parser.add_argument("-extracted_games_path", help="Path to folder containing extracted games", default=default_config.get("extracted_games_path"), widget='DirChooser')
-    parser.add_argument("-khgame_path", help="Path to the kh_1.5_2.5 folder", default=default_config.get("khgame_path"), widget='DirChooser')
-
-    parser.add_argument("-region", choices=["jp", "us", "uk", "it", "sp", "gr", "fr"], default=default_config.get("region", ""), help="defaults to 'us', needed to make sure the correct files are patched, as KH2FM PS2 mods use 'jp' as the region")
-
-    parser.add_argument("-restore", action="store_true", default=True, help="Will restore the games pkg files before applying the patch, using the pkgs found in 'backup_pkgs'")
-    parser.add_argument("-patch", action="store_true", default=True, help="Patch the games files with the contents of the Mods Manager 'mod' directory")
-
-    parser.add_argument("-backup", action="store_true", default=False, help="Will backup the games PKG files to a new folder in this directory called 'backup_pkgs' (warning, can take a lot of space)")
-    parser.add_argument("-extract", action="store_true", default=False, help="Will extract the games PKG files to be used by Mods Manger")
+    main_options.add_argument("-game", choices=list(games.keys()), default=default_config.get("game"), help="Which game to operate on", required=True)
+    main_options.add_argument("-mode", choices=["patch", "extract"], default="patch", help="Which mode to run (patch patches the game, and extract just extracts the pkg files for the game, which must be done before running Mod Manager)", required=True)
+    main_options.add_argument("-region", choices=["jp", "us", "uk", "it", "sp", "gr", "fr"], default=default_config.get("region", ""), help="defaults to 'us', needed to make sure the correct files are patched, as KH2FM PS2 mods use 'jp' as the region")
 
 
-    parser.add_argument("-keepkhbuild", action="store_true", default=False, help="Will keep the intermediate khbuild folder from being deleted after the patch is applied")
+    main_options = parser.add_argument_group(
+        "Setup",
+        "Paths that must be configured to make sure the patcher works properly. patches_path is optional."
+    )
+    main_options.add_argument("-openkh_path", help="Path to openKH folder", default=default_config.get("openkh_path"), widget='DirChooser')
+    main_options.add_argument("-extracted_games_path", help="Path to folder containing extracted games", default=default_config.get("extracted_games_path"), widget='DirChooser')
+    main_options.add_argument("-khgame_path", help="Path to the kh_1.5_2.5 folder", default=default_config.get("khgame_path"), widget='DirChooser')
+    main_options.add_argument("-patches_path", help="Path to directory containing other patches to apply. Will be applied in alphabetical order (with the mods manager 'mod' directory applied last). (optional)", default=default_config.get("khgame_path"), widget='DirChooser')
 
-    parser.add_argument('-ignoremissing', type=int, default=1, help="If true, prints a warning when a file can't be patched, rather than failing")
+
+    advanced_options = parser.add_argument_group(
+        "Advanced Options",
+        "Development options for the most part, if you don't know what these do then leave them alone."
+    )
+    advanced_options.add_argument("-keepkhbuild", action="store_true", default=False, help="Will keep the intermediate khbuild folder from being deleted after the patch is applied")
+    advanced_options.add_argument("-ignorebadchecksum", action="store_true", default=False, help="If true, disabled backing up and restoring the original PKG files based on checksums (you probably don't want to check this option)")
+    advanced_options.add_argument('-failonmissing', action="store_true", default=False, help="If true, fails when a file can't be patched to a PKG, rather than printing a warning")
 
     # Parse and print the results
     args = parser.parse_args()
@@ -132,20 +157,19 @@ def main():
         raise Exception("OpenKh.Command.IdxImg.exe not found")
     region = args.region
     game = games[gamename](region=region)
-    patch = args.patch
-    backup = args.backup
-    extract = args.extract
-    restore = args.restore
-    keepkhbuild = args.keepkhbuild
-    ignoremissing = args.ignoremissing
+    mode = args.mode
+    patch = True if mode == "patch" else False
+    extract = True if mode == "extract" else False
 
-    print("CONFIG TO RUN")
-    print("patch", type(patch), patch)
-    print("backup", backup)
-    print("extract", args.extract)
-    print("restore", args.restore)
-    print("keepkhbuild", args.keepkhbuild)
-    print("ignoremissing", args.ignoremissing)
+    extra_patches_dir = args.patches_path
+
+    keepkhbuild = args.keepkhbuild
+    validate_checksum = args.ignorebadchecksum
+    ignoremissing = not args.failonmissing
+
+    backup = True
+    restore = True if patch else False
+
     pkgmap = json.load(open("pkgmap.json")).get(game.name)
     if extract:
         print("Extracting {}".format(game.name))
@@ -160,6 +184,8 @@ def main():
             shutil.rmtree(EXTRACTED_GAME_PATH)
         os.makedirs(EXTRACTED_GAME_PATH)
         for pkgfile in pkglist:
+            if not validChecksum(pkgfile) and validate_checksum:
+                raise Exception("Error: {} has an invalid checksum, please restore the original file!".format(pkgfile))
             args = [IDXPATH, "hed", "extract", pkgfile, "-o", "extractedout"]
             print(IDXPATH, "hed", "extract", '"{}"'.format(pkgfile), "-o", '"{}"'.format("extractedout"))
             try:
@@ -180,8 +206,11 @@ def main():
         for pkg in game.pkgs:
             sourcefn = os.path.join(PKGDIR, pkg)
             newfn = os.path.join("backup_pkgs", pkg)
-            shutil.copy(sourcefn, newfn)
-            shutil.copy(sourcefn.split(".pkg")[0]+".hed", newfn.split(".pkg")[0]+".hed")
+            if not os.path.exists(newfn):
+                if not validChecksum(sourcefn) and validate_checksum :
+                    raise Exception("Error: {} has an invalid checksum, please restore the original file and try again".format(sourcefn))
+                shutil.copy(sourcefn, newfn)
+                shutil.copy(sourcefn.split(".pkg")[0]+".hed", newfn.split(".pkg")[0]+".hed")
     if restore:
         print("Restoring from backup")
         if not os.path.exists("backup_pkgs"):
@@ -189,6 +218,8 @@ def main():
         for pkg in game.pkgs:
             newfn = os.path.join(PKGDIR, pkg)
             sourcefn = os.path.join("backup_pkgs", pkg)
+            if not validChecksum(sourcefn) and validate_checksum:
+                raise Exception("Error: {} has an invalid checksum, please restore the original file and try again".format(sourcefn))
             shutil.copy(sourcefn, newfn)
             shutil.copy(sourcefn.split(".pkg")[0]+".hed", newfn.split(".pkg")[0]+".hed")
     if patch:
@@ -215,6 +246,22 @@ def main():
                     if not os.path.exists(new_basedir):
                         os.makedirs(new_basedir)
                     shutil.copy(fn, newfn)
+        other_patches = []
+        if os.path.exists(extra_patches_dir):
+            other_patches = [p for p in os.listdir(extra_patches_dir) if p.endswith(".kh2pcpatch")] #TODO double check extension
+        zipped_files = {}
+        for patch in sorted(other_patches):
+            # Read the patch in as a zip, or extract it out to some temp dir
+            # copy the files in based on the pkgmap
+            input_zip=ZipFile(patch)
+            for name in input_zip.namelist():
+                zipped_files[name] = input_zip.read(name)
+            zipped_files = {name: input_zip.read(name) for name in input_zip.namelist()}
+        for fn in zipped_files:
+            newfn = os.path.join("khbuild", fn)
+            # mods manager needs to take priority
+            if not os.path.exists(fn): 
+                open(newfn, "wb").write(zipped_files[fn])
         for pkg in os.listdir("khbuild"):
             pkgfile = os.path.join(PKGDIR, pkg+".pkg")
             modfolder = os.path.join("khbuild", pkg)
