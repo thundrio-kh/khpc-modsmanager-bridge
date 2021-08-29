@@ -25,6 +25,11 @@ class KingdomHearts2Patcher:
         if "ard" in path:
             if not "jp" in path and not self.region in path:
                 path = path.replace("ard"+os.sep, "ard"+os.sep+self.region+os.sep)
+        if "map" in path:
+            # maps don't have region specifier for some reason, or they split it out into two files for some reason...
+            path = path.split("map")[0]+"map"+os.sep+path.split(os.sep)[-1]
+        if path.endswith(".a.fm"):
+            path = path.replace(".a.fm", ".a.{}".format(self.region))
         return path
 
 class BirthBySleepPatcher:
@@ -98,7 +103,7 @@ def validChecksum(path):
         return False
     return True
 
-@Gooey
+#@Gooey
 def main():
     starttime = time.time()
 
@@ -187,6 +192,9 @@ def main():
     restore = True if patch else False
 
     pkgmap = json.load(open("pkgmap.json")).get(game.name)
+    pkgmap_extras = json.load(open("pkgmap_extras.json")).get(game.name) # predefined extras for patches that fail otherwise, such as GOA ROM
+    pkgmap.update(pkgmap_extras)
+
     if extract:
         print("Extracting {}".format(game.name))
         if not os.path.exists(args.extracted_games_path):
