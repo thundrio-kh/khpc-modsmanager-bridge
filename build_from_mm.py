@@ -7,8 +7,8 @@ from zipfile import ZipFile
 #In [2]: build_from_mm.main(cli_args=["-game=kh2", "-mode=patch"])
 
 # TODO 1.0.8 has new checksums for some of the packages, warn if on wrong checksomes
-# TODO restore option that just restores vanilla pkg files
 
+# TODO bundle as one file
 # TODO support HD paths
 # TODO bundle the pkgmap.json and pkgmap_extras.json as resources in the executable
 # TODO add music only extract
@@ -390,6 +390,7 @@ def main(cli_args: list = []):
 
 if __name__ == "__main__":
     import sys
-    if "ui" in sys.argv:
+    if "cmd" in sys.argv:
+        main()
+    else:
         main_ui()
-    main()
