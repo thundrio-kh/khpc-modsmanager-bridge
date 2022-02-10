@@ -337,7 +337,11 @@ def main(cli_args: list = []):
                             raise Exception("Exiting due to warning")
                         continue
                     for pkg in pkgs:
-                        newfn = os.path.join("khbuild", pkg, "original", relfn_trans)
+                    #newfn = os.path.join("khbuild", pkg, "original", relfn_trans)
+                        if "remastered" in relfn_trans:
+                            newfn = os.path.join("khbuild", pkg, relfn_trans)
+                        else:
+                            newfn = os.path.join("khbuild", pkg, "original", relfn_trans)
                         new_basedir = os.path.dirname(newfn)
                         if not os.path.exists(new_basedir):
                             os.makedirs(new_basedir)
