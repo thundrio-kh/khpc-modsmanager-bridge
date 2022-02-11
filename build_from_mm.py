@@ -1,4 +1,4 @@
-import sys, os, shutil, subprocess, json, time, argparse
+import sys, os, shutil, subprocess, json, time, argparse, re
 from gooey import Gooey, GooeyParser
 from zipfile import ZipFile
 
@@ -9,7 +9,7 @@ from zipfile import ZipFile
 # TODO 1.0.8 has new checksums for some of the packages, warn if on wrong checksomes
 
 # TODO bundle as one file
-# TODO support HD paths
+# TODO support HD paths (DA: should be fine now)
 # TODO bundle the pkgmap.json and pkgmap_extras.json as resources in the executable
 # TODO add music only extract
 # TODO blacklist bad directory paths, hide most output and make obvious errors more obvious (try to bulletproof it for non technical people)
@@ -28,7 +28,7 @@ class KingdomHearts1Patcher:
         self.region = region
         self.name = "kh1"
         self.pkgs = ["kh1_first.pkg", "kh1_second.pkg", "kh1_third.pkg", "kh1_fourth.pkg", "kh1_fifth.pkg"]
-    def translate_path(self, path):
+    def translate_path(self, path, moddir):
         if path.startswith(os.sep):
             path = path[1:]
         return path
@@ -40,7 +40,9 @@ class KingdomHearts2Patcher:
         self.region = region
         self.name = "kh2"
         self.pkgs = ["kh2_first.pkg", "kh2_second.pkg", "kh2_third.pkg", "kh2_fourth.pkg", "kh2_fifth.pkg", "kh2_sixth.pkg"]
-    def translate_path(self, path):
+    #some of this doesn't make sense to me. why the need to translate ps2 paths to pc ones?
+    #openkh mods manager uses the extracted pc data, so wouldn't the paths in the moddire be correct already?
+    def translate_path_old(self, path):
         if path.startswith(os.sep):
             path = path[1:]
         if os.sep+"jp"+os.sep in path:
@@ -54,6 +56,39 @@ class KingdomHearts2Patcher:
         if path.endswith(".a.fm"):
             path = path.replace(".a.fm", ".a.{}".format(self.region))
         return path
+    #changed code so the ps2/jp filenames only get translated if the bfmm region for it doesn't exist already
+    def translate_path(self, path, moddir):
+        if path.startswith(os.sep):
+            path = path[1:]
+        if not "remastered" in path:
+            if os.sep+"jp"+os.sep in path:
+                #check to see if the translated path allready exists and ignore if it does
+                prepath = path.replace(os.sep+"jp"+os.sep, os.sep+self.region+os.sep)
+                PCverExists = os.path.isfile(moddir+os.sep+prepath)
+                if not PCverExists:
+                    path = prepath
+            if "ard" in path:
+                if path.count(os.sep) == 1:
+                    #check to see if the translated path allready exists and ignore if it does
+                    prepath = path.replace("ard"+os.sep, "ard"+os.sep+self.region+os.sep)
+                    PCverExists = os.path.isfile(moddir+os.sep+prepath)
+                    if not PCverExists:
+                        path = prepath
+            if "map" in path:
+                if path.count(os.sep) == 2:
+                #maps don't have region specifier for some reason, or they split it out into two files for some reason...
+                    #check to see if the translated path allready exists and ignore if it does
+                    prepath = path.split("map")[0]+"map"+os.sep+path.split(os.sep)[-1]
+                    PCverExists = os.path.isfile(moddir+os.sep+prepath)
+                    if not PCverExists:
+                        path = prepath
+            if path.endswith(".a.fm"):
+                #check to see if the translated path allready exists and ignore if it does
+                prepath = path.replace(".a.fm", ".a.{}".format(self.region))
+                PCverExists = os.path.isfile(moddir+os.sep+prepath)
+                if not PCverExists:
+                    path = prepath
+        return path
     def translate_pkg_path(self, path):
         return path
 
@@ -62,7 +97,7 @@ class BirthBySleepPatcher:
         self.region = region
         self.name = "bbs"
         self.pkgs = ["bbs_first.pkg", "bbs_second.pkg", "bbs_third.pkg", "bbs_fourth.pkg"]
-    def translate_path(self, path):
+    def translate_path(self, path, moddir):
         if path.startswith(os.sep):
             path = path[1:]
         return path
@@ -73,7 +108,7 @@ class KingdomHearts3DPatcher:
         self.region = region
         self.name = "kh3d"
         self.pkgs = ["kh3d_first.pkg", "kh3d_second.pkg", "kh3d_third.pkg", "kh3d_fourth.pkg"]
-    def translate_path(self, path):
+    def translate_path(self, path, moddir):
         if path.startswith(os.sep):
             path = path[1:]
         return path
@@ -85,7 +120,7 @@ class RecomPatcher:
         self.region = region
         self.name = "recom"
         self.pkgs = ["Recom.pkg"]
-    def translate_path(self, path):
+    def translate_path(self, path, moddir):
         if path.startswith(os.sep):
             path = path[1:]
         return path
@@ -96,7 +131,7 @@ class MoviesPatcher:
         self.region = region
         self.name = "mare"
         self.pkgs = ["Mare.pkg"]
-    def translate_path(self, path):
+    def translate_path(self, path, moddir):
         if path.startswith(os.sep):
             path = path[1:]
         return path
@@ -328,7 +363,7 @@ def main(cli_args: list = []):
                 for file in files:
                     fn = os.path.join(root, file)
                     relfn = fn.replace(MODDIR, '')
-                    relfn_trans = game.translate_path(relfn)
+                    relfn_trans = game.translate_path(relfn, MODDIR)
                     print_debug("Translated Filename: {}".format(relfn_trans), verbose=True)
                     pkgs = pkgmap.get(relfn_trans, "")
                     if not pkgs:
