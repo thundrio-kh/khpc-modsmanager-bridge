@@ -1,4 +1,4 @@
-import sys, os, shutil, subprocess, json, time, argparse, re
+import sys, os, shutil, subprocess, json, time, argparse
 from gooey import Gooey, GooeyParser
 from zipfile import ZipFile
 
