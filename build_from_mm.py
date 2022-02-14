@@ -194,7 +194,7 @@ def validChecksum(path):
         return False
     return True
 
-@Gooey
+@Gooey(program_name="Mod Manager Bridge")
 def main_ui():
     main()
 
@@ -218,20 +218,20 @@ def main(cli_args: list = []):
         "The main options around the mode and game to use. All required"
     )
 
-    main_options.add_argument("-game", choices=list(games.keys()), default=default_config.get("game"), help="Which game to operate on", required=True)
-    main_options.add_argument("-mode", choices=["patch", "extract", "restore"], default="patch", help="Which mode to run (patch patches the game, and extract just extracts the pkg files for the game, which must be done before running Mod Manager. restore will restore the backed up pkg files without patching anything)", required=True)
-    main_options.add_argument("-region", choices=["jp", "us", "uk", "it", "sp", "gr", "fr"], default=default_config.get("region", ""), help="defaults to 'us', needed to make sure the correct files are patched, as KH2FM PS2 mods use 'jp' as the region")
+    main_options.add_argument("-game", choices=list(games.keys()), default=default_config.get("game"), help="Which game to operate on.", required=True)
+    main_options.add_argument("-mode", choices=["patch", "extract", "restore"], default="patch", help="Which mode to run (`Patch` patches the game, `Extract` extracts the pkg files for the game, and `Restore` will restore the backed up pkg files without patching anything)", required=True)
+    #removed `uk` from region choices. uk just uses us for everything anyway aside from some journal stuff so it's not worth using ever and causes confusion in my opinion.
+    main_options.add_argument("-region", choices=["jp", "us", "it", "sp", "gr", "fr"], default=default_config.get("region", ""), help="defaults to 'us', needed to make sure the correct files are patched")
 
 
     main_options = parser.add_argument_group(
         "Setup",
-        "Paths that must be configured to make sure the patcher works properly. patches_path is optional."
+        "Paths that must be configured to make sure the patcher works properly."
     )
-    main_options.add_argument("-openkh_path", help="Path to openKH folder", default=default_config.get("openkh_path"), widget='DirChooser')
+    main_options.add_argument("-openkh_path", help="Path to OpenKH folder.", default=default_config.get("openkh_path"), widget='DirChooser')
     main_options.add_argument("-extracted_games_path", help="Path to folder containing extracted games", default=default_config.get("extracted_games_path"), widget='DirChooser')
-    main_options.add_argument("-khgame_path", help="Path to the kh_1.5_2.5 folder", default=default_config.get("khgame_path"), widget='DirChooser')
-    main_options.add_argument("-patches_path", help="Path to directory containing other patches to apply. Will be applied in alphabetical order (with the mods manager 'mod' directory applied last). (optional)", default=default_config.get("patches_path"), widget='DirChooser')
-
+    main_options.add_argument("-khgame_path", help="Path to the Kingdom Hearts game install directory.", default=default_config.get("khgame_path"), widget='DirChooser')
+    main_options.add_argument("-patches_path", help="(Optional) Path to directory containing other kh2pcpatches to apply. Will be applied in alphabetical order (Mods Manager mods will be applied last).", default=default_config.get("patches_path"), widget='DirChooser')
 
     advanced_options = parser.add_argument_group(
         "Advanced Options",
