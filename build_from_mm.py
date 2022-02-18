@@ -1,4 +1,4 @@
-import sys, os, shutil, subprocess, json, time, argparse
+import sys, os, shutil, subprocess, json, time, argparse, re
 from gooey import Gooey, GooeyParser
 from zipfile import ZipFile
 
@@ -194,7 +194,7 @@ def validChecksum(path):
         return False
     return True
 
-@Gooey(program_name="Mod Manager Bridge")
+@Gooey(program_name="Mod Manager Bridge (TEST Ver.)")
 def main_ui():
     main()
 
@@ -233,6 +233,7 @@ def main(cli_args: list = []):
     main_options.add_argument("-khgame_path", help="Path to the Kingdom Hearts game install directory.", default=default_config.get("khgame_path"), widget='DirChooser')
     main_options.add_argument("-patches_path", help="(Optional) Path to directory containing other kh2pcpatches to apply. Will be applied in alphabetical order (Mods Manager mods will be applied last).", default=default_config.get("patches_path"), widget='DirChooser')
 
+
     advanced_options = parser.add_argument_group(
         "Advanced Options",
         "Development options for the most part, if you don't know what these do then leave them alone."
@@ -240,7 +241,10 @@ def main(cli_args: list = []):
     advanced_options.add_argument("-keepkhbuild", action="store_true", default=False, help="Will keep the intermediate khbuild folder from being deleted after the patch is applied")
     advanced_options.add_argument("-ignorebadchecksum", action="store_true", default=False, help="If true, disabled backing up and restoring the original PKG files based on checksums (you probably don't want to check this option)")
     advanced_options.add_argument('-failonmissing', action="store_true", default=False, help="If true, fails when a file can't be patched to a PKG, rather than printing a warning")
+    advanced_options.add_argument('-fastpatch', action="store_true", default=False, help="(EXPERIMENTAL) Will attempt to patch all files to the \"_first\" pkg for the selected game")
+    #advanced_options.add_argument('-fastrestore', action="store_true", default=False, help="(EXPERIMENTAL) Will only restore the "\"_first\" pkg for the selected game. ONLY ENABLE IF YOU ALREADY MANUALLY RESTORED YOUR GAME OR HAVE USED FASTPATCH PREVIOUSLY.")
 
+    
     # Parse and print the results
     if cli_args:
         args = parser.parse_args(cli_args)
@@ -286,6 +290,8 @@ def main(cli_args: list = []):
     keepkhbuild = args.keepkhbuild
     validate_checksum = args.ignorebadchecksum
     ignoremissing = not args.failonmissing
+    fastpatchmode = args.fastpatch
+    #fastrestoremode = args.fastrestore
 
     backup = True if mode in ["patch"] else False
     restore = True if mode in ["patch", "restore"] else False
@@ -344,7 +350,14 @@ def main(cli_args: list = []):
         print_debug("Restoring from backup")
         if not os.path.exists("backup_pkgs"):
             raise Exception("Backup folder doesn't exist")
+            
+        #if fastrestoremode:
+        #    if gamename != "Recom" or gamename != "Movies":
+        #        pkgname = gamename + "_first"
+  
         for pkg in game.pkgs:
+            pkgname = pkg
+                    
             newfn = os.path.join(PKGDIR, pkg)
             sourcefn = os.path.join("backup_pkgs", pkg)
             # The md5 takes too long to check so don't do it when restoring (TODO maybe check the checksums against the .hed files)
@@ -372,11 +385,16 @@ def main(cli_args: list = []):
                             raise Exception("Exiting due to warning")
                         continue
                     for pkg in pkgs:
-                    #newfn = os.path.join("khbuild", pkg, "original", relfn_trans)
+                        #default
+                        pkgname = pkg
+                        if gamename != "Recom" or gamename != "Movies":
+                            if fastpatchmode:
+                                pkgname = gamename + "_first"
+
                         if "remastered" in relfn_trans:
-                            newfn = os.path.join("khbuild", pkg, relfn_trans)
+                            newfn = os.path.join("khbuild", pkgname, relfn_trans)
                         else:
-                            newfn = os.path.join("khbuild", pkg, "original", relfn_trans)
+                            newfn = os.path.join("khbuild", pkgname, "original", relfn_trans)
                         new_basedir = os.path.dirname(newfn)
                         if not os.path.exists(new_basedir):
                             os.makedirs(new_basedir)
