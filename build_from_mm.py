@@ -241,9 +241,7 @@ def main(cli_args: list = []):
     advanced_options.add_argument("-keepkhbuild", action="store_true", default=False, help="Will keep the intermediate khbuild folder from being deleted after the patch is applied")
     advanced_options.add_argument("-ignorebadchecksum", action="store_true", default=False, help="If true, disabled backing up and restoring the original PKG files based on checksums (you probably don't want to check this option)")
     advanced_options.add_argument('-failonmissing', action="store_true", default=False, help="If true, fails when a file can't be patched to a PKG, rather than printing a warning")
-    advanced_options.add_argument('-fastpatch', action="store_true", default=False, help="(EXPERIMENTAL) Will attempt to patch all files to the \"_first\" pkg for the selected game")
-    #advanced_options.add_argument('-fastrestore', action="store_true", default=False, help="(EXPERIMENTAL) Will only restore the "\"_first\" pkg for the selected game. ONLY ENABLE IF YOU ALREADY MANUALLY RESTORED YOUR GAME OR HAVE USED FASTPATCH PREVIOUSLY.")
-
+    advanced_options.add_argument('-fastpatch', action="store_true", default=default_config.get("fast_patch"), help="(EXPERIMENTAL) Will attempt to patch all files to the \"_first\" pkg for the selected game")
     
     # Parse and print the results
     if cli_args:
@@ -257,7 +255,8 @@ def main(cli_args: list = []):
         "extracted_games_path": args.extracted_games_path,
         "khgame_path": args.khgame_path,
         "region": args.region,
-        "patches_path": args.patches_path
+        "patches_path": args.patches_path,
+        "fast_patch": args.fastpatch
     }
 
     json.dump(config_to_write, open("config.json", "w"))
@@ -351,20 +350,22 @@ def main(cli_args: list = []):
         if not os.path.exists("backup_pkgs"):
             raise Exception("Backup folder doesn't exist")
             
-        #if fastrestoremode:
-        #    if gamename != "Recom" or gamename != "Movies":
-        #        pkgname = gamename + "_first"
-  
-        for pkg in game.pkgs:
-            pkgname = pkg
-                    
-            newfn = os.path.join(PKGDIR, pkg)
-            sourcefn = os.path.join("backup_pkgs", pkg)
-            # The md5 takes too long to check so don't do it when restoring (TODO maybe check the checksums against the .hed files)
-            # if not validChecksum(sourcefn) and validate_checksum:
-            #     raise Exception("Error: {} has an invalid checksum, please restore the original file and try again".format(sourcefn))
-            shutil.copy(sourcefn, newfn)
-            shutil.copy(sourcefn.split(".pkg")[0]+".hed", newfn.split(".pkg")[0]+".hed")
+        if fastpatchmode:
+            if gamename != "Recom" or gamename != "Movies":
+                pkgname = gamename + "_first.pkg"
+                newfn = os.path.join(PKGDIR, pkgname)
+                sourcefn = os.path.join("backup_pkgs", pkgname)
+                shutil.copy(sourcefn, newfn)
+                shutil.copy(sourcefn.split(".pkg")[0]+".hed", newfn.split(".pkg")[0]+".hed")
+        else:
+            for pkg in game.pkgs:
+                newfn = os.path.join(PKGDIR, pkg)
+                sourcefn = os.path.join("backup_pkgs", pkg)
+                # The md5 takes too long to check so don't do it when restoring (TODO maybe check the checksums against the .hed files)
+                # if not validChecksum(sourcefn) and validate_checksum:
+                #     raise Exception("Error: {} has an invalid checksum, please restore the original file and try again".format(sourcefn))
+                shutil.copy(sourcefn, newfn)
+                shutil.copy(sourcefn.split(".pkg")[0]+".hed", newfn.split(".pkg")[0]+".hed")
     if patch:
         print_debug("Patching")
         if os.path.exists("khbuild"):
@@ -387,10 +388,9 @@ def main(cli_args: list = []):
                     for pkg in pkgs:
                         #default
                         pkgname = pkg
-                        if gamename != "Recom" or gamename != "Movies":
-                            if fastpatchmode:
+                        if fastpatchmode:
+                            if gamename != "Recom" or gamename != "Movies":
                                 pkgname = gamename + "_first"
-
                         if "remastered" in relfn_trans:
                             newfn = os.path.join("khbuild", pkgname, relfn_trans)
                         else:
@@ -412,7 +412,15 @@ def main(cli_args: list = []):
         for fn in zipped_files:
             if len(zipped_files[fn]) == 0:
                 continue
-            newfn = os.path.join("khbuild", fn)
+            #default
+            fastfn = fn
+            if fastpatchmode:
+                if gamename != "Recom" or gamename != "Movies":
+                    if "/original/" in fn:
+                        fastfn = gamename+"_first/original/"+fn.split("/original/")[1]
+                    elif "/remastered/" in fn:
+                        fastfn = gamename+"_first/remastered/"+fn.split("/remastered/")[1]
+            newfn = os.path.join("khbuild", fastfn)
             # mods manager needs to take priority
             if not os.path.exists(newfn): 
                 new_basedir = os.path.dirname(newfn)
