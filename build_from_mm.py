@@ -16,7 +16,7 @@ from zipfile import ZipFile
 # TODO make it a library
 # TODO make a pypi package
 
-VERBOSE_PRINTS = False
+VERBOSE_PRINTS = True
 
 def print_debug(*args, **kwargs):
     verbose = "verbose" in kwargs and kwargs["verbose"]
@@ -148,6 +148,7 @@ games = {
 }
 DEFAULTREGION = "us"
 DEFAULTGAME = "kh2"
+DEFAULTMODE = "patch"
 
 old_checksums = {
     'kh2_first.pkg': 'b977794bb340dc6c7fad486940af48a4',
@@ -194,7 +195,7 @@ def validChecksum(path):
         return False
     return True
 
-@Gooey(program_name="Mod Manager Bridge (TEST Ver.)")
+@Gooey(program_name="Mod Manager Bridge (TEST Ver. 2)")
 def main_ui():
     main()
 
@@ -203,10 +204,12 @@ def main(cli_args: list = []):
 
     default_config = {
         "game": DEFAULTGAME,
+        "mode": DEFAULTMODE,
         "openkh_path": "",
         "extracted_games_path": "",
         "khgame_path": "",
-        "region": DEFAULTREGION
+        "region": DEFAULTREGION,
+        "patches_path": ""
     }
     if os.path.exists("config.json"):
         default_config = json.load(open("config.json"))
@@ -217,9 +220,14 @@ def main(cli_args: list = []):
         "Main options",
         "The main options around the mode and game to use. All required"
     )
+    
+    getmode = DEFAULTMODE
+    if default_config.get("mode") is not None:
+        if "fast" in default_config.get("mode"):
+            getmode = "fast_patch"
 
     main_options.add_argument("-game", choices=list(games.keys()), default=default_config.get("game"), help="Which game to operate on.", required=True)
-    main_options.add_argument("-mode", choices=["patch", "extract", "restore"], default="patch", help="Which mode to run (`Patch` patches the game, `Extract` extracts the pkg files for the game, and `Restore` will restore the backed up pkg files without patching anything)", required=True)
+    main_options.add_argument("-mode", choices=["extract", "patch", "restore", "fast_patch", "fast_restore"], default=getmode, help="Which mode to run (`Patch` patches the game, `Extract` extracts the pkg files for the game, and `Restore` will restore the backed up pkg files without patching anything)", required=True)
     #removed `uk` from region choices. uk just uses us for everything anyway aside from some journal stuff so it's not worth using ever and causes confusion in my opinion.
     main_options.add_argument("-region", choices=["jp", "us", "it", "sp", "gr", "fr"], default=default_config.get("region", ""), help="defaults to 'us', needed to make sure the correct files are patched")
 
@@ -241,7 +249,9 @@ def main(cli_args: list = []):
     advanced_options.add_argument("-keepkhbuild", action="store_true", default=False, help="Will keep the intermediate khbuild folder from being deleted after the patch is applied")
     advanced_options.add_argument("-ignorebadchecksum", action="store_true", default=False, help="If true, disabled backing up and restoring the original PKG files based on checksums (you probably don't want to check this option)")
     advanced_options.add_argument('-failonmissing', action="store_true", default=False, help="If true, fails when a file can't be patched to a PKG, rather than printing a warning")
-    advanced_options.add_argument('-fastpatch', action="store_true", default=default_config.get("fast_patch"), help="(EXPERIMENTAL) Will attempt to patch all files to the \"_first\" pkg for the selected game")
+    #advanced_options.add_argument('-onlyextrapatches', action="store_true", default=False, help="")
+    #advanced_options.add_argument('-fastpatch', action="store_true", default=default_config.get("fast_patch"), help="(EXPERIMENTAL) Will attempt to patch all files to the \"_first\" pkg for the selected game")
+    
     
     # Parse and print the results
     if cli_args:
@@ -251,21 +261,18 @@ def main(cli_args: list = []):
 
     config_to_write = {
         "game": args.game,
+        "mode": args.mode,
         "openkh_path": args.openkh_path,
         "extracted_games_path": args.extracted_games_path,
         "khgame_path": args.khgame_path,
         "region": args.region,
         "patches_path": args.patches_path,
-        "fast_patch": args.fastpatch
     }
-
     json.dump(config_to_write, open("config.json", "w"))
 
     MODDIR = os.path.join(args.openkh_path, "mod")
-
     IDXDIR = args.openkh_path
     IDXPATH = os.path.join(IDXDIR, "OpenKh.Command.IdxImg.exe")
-
 
     gamename = args.game
     if not args.game in games:
@@ -281,7 +288,8 @@ def main(cli_args: list = []):
         raise Exception("OpenKh.Command.IdxImg.exe not found")
 
     mode = args.mode
-    patch = True if mode == "patch" else False
+    patch = True if mode in ["patch", "fast_patch"] else False
+    fastpatch = True if mode == "fast_patch" else False
     extract = True if mode == "extract" else False
 
     extra_patches_dir = args.patches_path or ''
@@ -289,11 +297,12 @@ def main(cli_args: list = []):
     keepkhbuild = args.keepkhbuild
     validate_checksum = args.ignorebadchecksum
     ignoremissing = not args.failonmissing
-    fastpatchmode = args.fastpatch
+    #fastpatchmode = args.fastpatch
     #fastrestoremode = args.fastrestore
 
-    backup = True if mode in ["patch"] else False
-    restore = True if mode in ["patch", "restore"] else False
+    backup = True if mode in ["patch", "fast_patch"] else False
+    restore = True if mode in ["patch", "restore", "fast_patch", "fast_restore"] else False
+    fastrestore = True if mode in ["fast_patch", "fast_restore"] else False
 
     pkgmap = json.load(open("pkgmap.json")).get(game.name, {})
     pkgmap_extras = json.load(open("pkgmap_extras.json")).get(game.name, {}) # predefined extras for patches that fail otherwise, such as GOA ROM
@@ -334,13 +343,13 @@ def main(cli_args: list = []):
         shutil.move(original_path, args.extracted_games_path)
         os.rename(os.path.join(args.extracted_games_path, "original"), EXTRACTED_GAME_PATH)
     if backup:
-        print_debug("Backing up")
         if not os.path.exists("backup_pkgs"):
             os.makedirs("backup_pkgs")
         for pkg in game.pkgs:
             sourcefn = os.path.join(PKGDIR, pkg)
             newfn = os.path.join("backup_pkgs", pkg)
             if not os.path.exists(newfn):
+                print_debug("Backing up file: " + sourcefn)
                 if not validChecksum(sourcefn) and validate_checksum :
                     raise Exception("Error: {} has an invalid checksum, please restore the original file and try again".format(sourcefn))
                 shutil.copy(sourcefn, newfn)
@@ -349,8 +358,7 @@ def main(cli_args: list = []):
         print_debug("Restoring from backup")
         if not os.path.exists("backup_pkgs"):
             raise Exception("Backup folder doesn't exist")
-            
-        if fastpatchmode:
+        if fastrestore:
             if gamename != "Recom" or gamename != "Movies":
                 pkgname = gamename + "_first.pkg"
                 newfn = os.path.join(PKGDIR, pkgname)
@@ -388,7 +396,7 @@ def main(cli_args: list = []):
                     for pkg in pkgs:
                         #default
                         pkgname = pkg
-                        if fastpatchmode:
+                        if fastpatch:
                             if gamename != "Recom" or gamename != "Movies":
                                 pkgname = gamename + "_first"
                         if "remastered" in relfn_trans:
@@ -414,7 +422,7 @@ def main(cli_args: list = []):
                 continue
             #default
             fastfn = fn
-            if fastpatchmode:
+            if fastpatch:
                 if gamename != "Recom" or gamename != "Movies":
                     if "/original/" in fn:
                         fastfn = gamename+"_first/original/"+fn.split("/original/")[1]
@@ -451,7 +459,7 @@ def main(cli_args: list = []):
             shutil.copy(os.path.join("pkgoutput", pkg+".hed"), os.path.join(PKGDIR, pkg+".hed"))
         if not keepkhbuild:
             shutil.rmtree("khbuild")
-    print_debug("All done! Took {}s".format(time.time()-starttime))
+    print_debug("All done! Took {}s".format(round(time.time()-starttime, 2)) + " | Mode: " + mode)
 
 if __name__ == "__main__":
     import sys
