@@ -16,7 +16,7 @@ from zipfile import ZipFile
 # TODO make it a library
 # TODO make a pypi package
 
-VERBOSE_PRINTS = True
+VERBOSE_PRINTS = False
 
 def print_debug(*args, **kwargs):
     verbose = "verbose" in kwargs and kwargs["verbose"]
