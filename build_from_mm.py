@@ -195,7 +195,7 @@ def validChecksum(path):
         return False
     return True
 
-@Gooey(program_name="Mod Manager Bridge (TEST Ver. 2)")
+@Gooey(program_name="Mod Manager Bridge")
 def main_ui():
     main()
 
