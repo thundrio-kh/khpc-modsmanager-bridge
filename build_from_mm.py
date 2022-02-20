@@ -9,7 +9,6 @@ from zipfile import ZipFile
 # TODO 1.0.8 has new checksums for some of the packages, warn if on wrong checksomes
 
 # TODO bundle as one file
-# TODO support HD paths (DA: should be fine now)
 # TODO bundle the pkgmap.json and pkgmap_extras.json as resources in the executable
 # TODO add music only extract
 # TODO blacklist bad directory paths, hide most output and make obvious errors more obvious (try to bulletproof it for non technical people)
@@ -248,10 +247,7 @@ def main(cli_args: list = []):
     )
     advanced_options.add_argument("-keepkhbuild", action="store_true", default=False, help="Will keep the intermediate khbuild folder from being deleted after the patch is applied")
     advanced_options.add_argument("-ignorebadchecksum", action="store_true", default=False, help="If true, disabled backing up and restoring the original PKG files based on checksums (you probably don't want to check this option)")
-    advanced_options.add_argument('-failonmissing', action="store_true", default=False, help="If true, fails when a file can't be patched to a PKG, rather than printing a warning")
-    #advanced_options.add_argument('-onlyextrapatches', action="store_true", default=False, help="")
-    #advanced_options.add_argument('-fastpatch', action="store_true", default=default_config.get("fast_patch"), help="(EXPERIMENTAL) Will attempt to patch all files to the \"_first\" pkg for the selected game")
-    
+    advanced_options.add_argument('-failonmissing', action="store_true", default=False, help="If true, fails when a file can't be patched to a PKG, rather than printing a warning")  
     
     # Parse and print the results
     if cli_args:
@@ -297,8 +293,6 @@ def main(cli_args: list = []):
     keepkhbuild = args.keepkhbuild
     validate_checksum = args.ignorebadchecksum
     ignoremissing = not args.failonmissing
-    #fastpatchmode = args.fastpatch
-    #fastrestoremode = args.fastrestore
 
     backup = True if mode in ["patch", "fast_patch"] else False
     restore = True if mode in ["patch", "restore", "fast_patch", "fast_restore"] else False
