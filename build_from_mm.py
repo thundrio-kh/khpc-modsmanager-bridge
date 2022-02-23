@@ -9,13 +9,14 @@ from zipfile import ZipFile
 # TODO 1.0.8 has new checksums for some of the packages, warn if on wrong checksomes
 
 # TODO bundle as one file
+# TODO support HD paths (DA: should be fine now)
 # TODO bundle the pkgmap.json and pkgmap_extras.json as resources in the executable
 # TODO add music only extract
 # TODO blacklist bad directory paths, hide most output and make obvious errors more obvious (try to bulletproof it for non technical people)
 # TODO make it a library
 # TODO make a pypi package
 
-VERBOSE_PRINTS = False
+VERBOSE_PRINTS = True
 
 def print_debug(*args, **kwargs):
     verbose = "verbose" in kwargs and kwargs["verbose"]
@@ -61,14 +62,14 @@ class KingdomHearts2Patcher:
             path = path[1:]
         if not "remastered" in path:
             if os.sep+"jp"+os.sep in path:
-                #check to see if the translated path allready exists and ignore if it does
+                #check to see if the translated path already exists and ignore if it does
                 prepath = path.replace(os.sep+"jp"+os.sep, os.sep+self.region+os.sep)
                 PCverExists = os.path.isfile(moddir+os.sep+prepath)
                 if not PCverExists:
                     path = prepath
             if "ard" in path:
                 if path.count(os.sep) == 1:
-                    #check to see if the translated path allready exists and ignore if it does
+                    #check to see if the translated path already exists and ignore if it does
                     prepath = path.replace("ard"+os.sep, "ard"+os.sep+self.region+os.sep)
                     PCverExists = os.path.isfile(moddir+os.sep+prepath)
                     if not PCverExists:
@@ -76,13 +77,13 @@ class KingdomHearts2Patcher:
             if "map" in path:
                 if path.count(os.sep) == 2:
                 #maps don't have region specifier for some reason, or they split it out into two files for some reason...
-                    #check to see if the translated path allready exists and ignore if it does
+                    #check to see if the translated path already exists and ignore if it does
                     prepath = path.split("map")[0]+"map"+os.sep+path.split(os.sep)[-1]
                     PCverExists = os.path.isfile(moddir+os.sep+prepath)
                     if not PCverExists:
                         path = prepath
             if path.endswith(".a.fm"):
-                #check to see if the translated path allready exists and ignore if it does
+                #check to see if the translated path already exists and ignore if it does
                 prepath = path.replace(".a.fm", ".a.{}".format(self.region))
                 PCverExists = os.path.isfile(moddir+os.sep+prepath)
                 if not PCverExists:
@@ -220,6 +221,7 @@ def main(cli_args: list = []):
         "The main options around the mode and game to use. All required"
     )
     
+    #fallback measure for backwards compalibility with the old config.json
     getmode = DEFAULTMODE
     if default_config.get("mode") is not None:
         if "fast" in default_config.get("mode"):
@@ -247,7 +249,8 @@ def main(cli_args: list = []):
     )
     advanced_options.add_argument("-keepkhbuild", action="store_true", default=False, help="Will keep the intermediate khbuild folder from being deleted after the patch is applied")
     advanced_options.add_argument("-ignorebadchecksum", action="store_true", default=False, help="If true, disabled backing up and restoring the original PKG files based on checksums (you probably don't want to check this option)")
-    advanced_options.add_argument('-failonmissing', action="store_true", default=False, help="If true, fails when a file can't be patched to a PKG, rather than printing a warning")  
+    advanced_options.add_argument('-failonmissing', action="store_true", default=False, help="If true, fails when a file can't be patched to a PKG, rather than printing a warning")
+    #advanced_options.add_argument('-patchunknown', action="store_true", default=False, help="If true, unknown filenames will try to be patched to the game's first PKG.")
     
     # Parse and print the results
     if cli_args:
@@ -293,6 +296,7 @@ def main(cli_args: list = []):
     keepkhbuild = args.keepkhbuild
     validate_checksum = args.ignorebadchecksum
     ignoremissing = not args.failonmissing
+    #patchunknownnames = args.patchunknown
 
     backup = True if mode in ["patch", "fast_patch"] else False
     restore = True if mode in ["patch", "restore", "fast_patch", "fast_restore"] else False
