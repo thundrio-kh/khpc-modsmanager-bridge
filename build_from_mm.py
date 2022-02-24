@@ -16,7 +16,7 @@ from zipfile import ZipFile
 # TODO make it a library
 # TODO make a pypi package
 
-VERBOSE_PRINTS = False
+VERBOSE_PRINTS = True
 
 def print_debug(*args, **kwargs):
     verbose = "verbose" in kwargs and kwargs["verbose"]
@@ -304,6 +304,7 @@ def main(cli_args: list = []):
 
     pkgmap = json.load(open("pkgmap.json")).get(game.name, {})
     pkgmap_extras = json.load(open("pkgmap_extras.json")).get(game.name, {}) # predefined extras for patches that fail otherwise, such as GOA ROM
+    pkgmap_blacklist = json.load(open("pkgmap_blacklist.json")).get(game.name, {}) # blacklist of bad files to replace
     pkgmap.update(pkgmap_extras)
 
     if extract:
@@ -386,25 +387,29 @@ def main(cli_args: list = []):
                     relfn_trans = game.translate_path(relfn, MODDIR)
                     print_debug("Translated Filename: {}".format(relfn_trans), verbose=True)
                     pkgs = pkgmap.get(relfn_trans, "")
+                    pkgsblk = pkgmap_blacklist.get(relfn_trans, "")
                     if not pkgs:
                         print_debug("WARNING: Could not find which pkg this path belongs, file not patched: {} (original path {})".format(relfn_trans, relfn))
                         if not ignoremissing:
                             raise Exception("Exiting due to warning")
                         continue
+                    if pkgsblk:
+                        print_debug("WARNING: File blacklisted, file not patched: {})".format(relfn_trans))
                     for pkg in pkgs:
                         #default
-                        pkgname = pkg
-                        if fastpatch:
-                            if gamename != "Recom" or gamename != "Movies":
-                                pkgname = gamename + "_first"
-                        if "remastered" in relfn_trans:
-                            newfn = os.path.join("khbuild", pkgname, relfn_trans)
-                        else:
-                            newfn = os.path.join("khbuild", pkgname, "original", relfn_trans)
-                        new_basedir = os.path.dirname(newfn)
-                        if not os.path.exists(new_basedir):
-                            os.makedirs(new_basedir)
-                        shutil.copy(fn, newfn)
+                        if pkg not in pkgsblk:
+                            pkgname = pkg
+                            if fastpatch:
+                                if gamename != "Recom" or gamename != "Movies":
+                                    pkgname = gamename + "_first"
+                            if "remastered" in relfn_trans:
+                                newfn = os.path.join("khbuild", pkgname, relfn_trans)
+                            else:
+                                newfn = os.path.join("khbuild", pkgname, "original", relfn_trans)
+                            new_basedir = os.path.dirname(newfn)
+                            if not os.path.exists(new_basedir):
+                                os.makedirs(new_basedir)
+                            shutil.copy(fn, newfn)
         other_patches = []
         if extra_patches_dir and os.path.exists(extra_patches_dir):
             other_patches = [os.path.join(extra_patches_dir,p) for p in os.listdir(extra_patches_dir) if p.endswith(".kh2pcpatch")] #TODO double check extension
