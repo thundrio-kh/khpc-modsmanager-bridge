@@ -62,11 +62,12 @@ class KingdomHearts2Patcher:
             path = path[1:]
         if not "remastered" in path:
             if os.sep+"jp"+os.sep in path:
-                #check to see if the translated path already exists and ignore if it does
-                prepath = path.replace(os.sep+"jp"+os.sep, os.sep+self.region+os.sep)
-                PCverExists = os.path.isfile(moddir+os.sep+prepath)
-                if not PCverExists:
-                    path = prepath
+                if not ".2ld" in path:
+                    #check to see if the translated path already exists and ignore if it does
+                    prepath = path.replace(os.sep+"jp"+os.sep, os.sep+self.region+os.sep)
+                    PCverExists = os.path.isfile(moddir+os.sep+prepath)
+                    if not PCverExists:
+                        path = prepath
             if "ard" in path:
                 if path.count(os.sep) == 1:
                     #check to see if the translated path already exists and ignore if it does

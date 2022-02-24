@@ -1,10 +1,5 @@
 {
     "kh2": {
-		"file\\fr\\tr_tm.2ld": ["kh2_fifth"],
-		"file\\gr\\tr_tm.2ld": ["kh2_fifth"],
-		"file\\it\\tr_tm.2ld": ["kh2_fifth"],
-		"file\\sp\\tr_tm.2ld": ["kh2_fifth"],
-		"file\\us\\tr_tm.2ld": ["kh2_fifth"],
 		"file\\jp\\tr_tm.2ld": ["kh2_fifth"]
     }
 }
