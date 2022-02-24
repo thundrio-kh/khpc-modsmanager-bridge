@@ -16,7 +16,7 @@ from zipfile import ZipFile
 # TODO make it a library
 # TODO make a pypi package
 
-VERBOSE_PRINTS = True
+VERBOSE_PRINTS = False
 
 def print_debug(*args, **kwargs):
     verbose = "verbose" in kwargs and kwargs["verbose"]
@@ -395,6 +395,9 @@ def main(cli_args: list = []):
                         continue
                     if pkgsblk:
                         print_debug("WARNING: File blacklisted, file not patched: {})".format(relfn_trans))
+                        if not ignoremissing:
+                            raise Exception("Exiting due to warning")
+                        continue
                     for pkg in pkgs:
                         #default
                         if pkg not in pkgsblk:
