@@ -16,7 +16,7 @@ from zipfile import ZipFile
 # TODO make it a library
 # TODO make a pypi package
 
-VERBOSE_PRINTS = False
+VERBOSE_PRINTS = True
 
 def print_debug(*args, **kwargs):
     verbose = "verbose" in kwargs and kwargs["verbose"]
@@ -40,27 +40,12 @@ class KingdomHearts2Patcher:
         self.region = region
         self.name = "kh2"
         self.pkgs = ["kh2_first.pkg", "kh2_second.pkg", "kh2_third.pkg", "kh2_fourth.pkg", "kh2_fifth.pkg", "kh2_sixth.pkg"]
-    #some of this doesn't make sense to me. why the need to translate ps2 paths to pc ones?
-    #openkh mods manager uses the extracted pc data, so wouldn't the paths in the moddire be correct already?
-    def translate_path_old(self, path):
-        if path.startswith(os.sep):
-            path = path[1:]
-        if os.sep+"jp"+os.sep in path:
-            path = path.replace(os.sep+"jp"+os.sep, os.sep+self.region+os.sep)
-        if "ard" in path:
-            if not "jp" in path and not self.region in path:
-                path = path.replace("ard"+os.sep, "ard"+os.sep+self.region+os.sep)
-        if "map" in path:
-            # maps don't have region specifier for some reason, or they split it out into two files for some reason...
-            path = path.split("map")[0]+"map"+os.sep+path.split(os.sep)[-1]
-        if path.endswith(".a.fm"):
-            path = path.replace(".a.fm", ".a.{}".format(self.region))
-        return path
-    #changed code so the ps2/jp filenames only get translated if the bfmm region for it doesn't exist already
     def translate_path(self, path, moddir):
         if path.startswith(os.sep):
             path = path[1:]
-        if not "remastered" in path:
+        #only translate paths that aren't in the raw or remastred folders
+        #this is because those paths are always only used for the PC port
+        if not path.startswith("remastered"+os.sep) or not path.startswith("raw"+os.sep):
             if os.sep+"jp"+os.sep in path:
                 if not ".2ld" in path:
                     #check to see if the translated path already exists and ignore if it does
@@ -196,7 +181,7 @@ def validChecksum(path):
         return False
     return True
 
-@Gooey(program_name="Mod Manager Bridge")
+@Gooey(program_name="Mod Manager Bridge (Test Ver.3)")
 def main_ui():
     main()
 
@@ -387,7 +372,12 @@ def main(cli_args: list = []):
                     relfn = fn.replace(MODDIR, '')
                     relfn_trans = game.translate_path(relfn, MODDIR)
                     print_debug("Translated Filename: {}".format(relfn_trans), verbose=True)
-                    pkgs = pkgmap.get(relfn_trans, "")
+                    #raw paths are the exact same as original paths, just with the root flder being "raw" instead of "original"
+                    #so we can check against the original path instead of needing to update the pkgmap.
+                    if "raw"+os.sep in relfn_trans:
+                        pkgs = pkgmap.get(relfn_trans.replace("raw"+os.sep, ""), "")
+                    else:
+                        pkgs = pkgmap.get(relfn_trans, "")
                     pkgsblk = pkgmap_blacklist.get(relfn_trans, "")
                     if not pkgs:
                         print_debug("WARNING: Could not find which pkg this path belongs, file not patched: {} (original path {})".format(relfn_trans, relfn))
@@ -400,13 +390,18 @@ def main(cli_args: list = []):
                             raise Exception("Exiting due to warning")
                         continue
                     for pkg in pkgs:
-                        #default
+                        #only patch if the file does not exist in the blacklist pkgmap.
                         if pkg not in pkgsblk:
+                            #default
                             pkgname = pkg
+                            #fast_patch forces the pkg name to be the first PKG for all file, if the 
+                            #gamename isn't Recom or Movies as those are only in a single PKG anyway.
                             if fastpatch:
                                 if gamename != "Recom" or gamename != "Movies":
                                     pkgname = gamename + "_first"
-                            if "remastered" in relfn_trans:
+                            #"remastered" and "raw" paths are always already in their own folders 
+                            #so no need to add the folder name to the newfn path.
+                            if "remastered"+os.sep in relfn_trans or "raw"+os.sep in relfn_trans:
                                 newfn = os.path.join("khbuild", pkgname, relfn_trans)
                             else:
                                 newfn = os.path.join("khbuild", pkgname, "original", relfn_trans)
@@ -429,12 +424,15 @@ def main(cli_args: list = []):
                 continue
             #default
             fastfn = fn
+            #extract all kh2pcpatch files to the first PKG if fast_patch is used.
             if fastpatch:
                 if gamename != "Recom" or gamename != "Movies":
                     if "/original/" in fn:
                         fastfn = gamename+"_first/original/"+fn.split("/original/")[1]
                     elif "/remastered/" in fn:
                         fastfn = gamename+"_first/remastered/"+fn.split("/remastered/")[1]
+                    elif "/raw/" in fn:
+                        fastfn = gamename+"_first/raw/"+fn.split("/raw/")[1]
             newfn = os.path.join("khbuild", fastfn)
             # mods manager needs to take priority
             if not os.path.exists(newfn): 
@@ -449,6 +447,8 @@ def main(cli_args: list = []):
                 os.makedirs(os.path.join(modfolder, "remastered"))
             if not os.path.exists(os.path.join(modfolder, "original")):
                 os.makedirs(os.path.join(modfolder, "original"))
+            if not os.path.exists(os.path.join(modfolder, "raw")):
+                os.makedirs(os.path.join(modfolder, "raw"))
             if os.path.exists("pkgoutput"):
                 shutil.rmtree("pkgoutput")
             print_debug("Patching: {}".format(pkg))
