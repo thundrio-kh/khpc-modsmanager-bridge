@@ -456,7 +456,7 @@ def main(cli_args: list = []):
             #print_debug(IDXPATH, "hed", "patch", '"{}"'.format(pkgfile), '"modfolder"', "-o", '"{}"'.format("pkgoutput"))
             try:
                 print_debug(args, verbose=False)
-                output = subprocess.check_output(args, stderr=subprocess.STDOUT)
+                output = subprocess.check_output(args, stderr=subprocess.STDOUT).decode('utf-8').replace("\n", "")
                 print_debug(output, verbose=True)
             except subprocess.CalledProcessError as err:
                 output = err.output
