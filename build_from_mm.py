@@ -323,7 +323,7 @@ def main(cli_args: list = []):
                 raise Exception("Extract failed")
         original_path = os.path.join("extractedout", "original")
         remastered_path = os.path.join("extractedout", "remastered")
-        if os.path.exists("remastered"):
+        if os.path.exists(remastered_path):
             shutil.move(remastered_path, os.path.join(original_path, "remastered"))
         shutil.move(original_path, args.extracted_games_path)
         os.rename(os.path.join(args.extracted_games_path, "original"), EXTRACTED_GAME_PATH)
