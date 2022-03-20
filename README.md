@@ -19,3 +19,7 @@ Note: When using GOA Rom edition, must use the openkh mod for GOA Rom, rather th
 5 - in build_from_mm gui, make sure patch is the mode selected. Then click start
 
 6 - Once that is complete you can load up the game
+
+## Compiling to exe
+
+pyinstaller build_from_mm.py --add-data pkgmap*.json;. -F

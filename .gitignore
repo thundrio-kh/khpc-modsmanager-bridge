@@ -9,3 +9,4 @@ khbuild
 extractedout
 *.pycache
 config.json
+dist_old

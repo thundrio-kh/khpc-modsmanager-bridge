@@ -166,7 +166,30 @@ checksums = {
     'kh3d_fourth.pkg': '7ec4b89a5f9fe47b6f5fb046e710efcd',
     'kh3d_second.pkg': 'bb7fa91a01bc56a4307dad6f6769f1c1',
     'kh3d_third.pkg': 'c0f4bd34a14450956cd521842349cd24',
-    'Mare.pkg': 'dbc743fef9e9bc7c974619e720082d18'
+    'Mare.pkg': 'dbc743fef9e9bc7c974619e720082d18',
+
+    'Recom.hed': '7722d36212d5ef9057ed47eda82b4a04',
+    'Theater.hed': '3819742df5acd4f6dd80c204b69a73bd',
+    'bbs_first.hed': '0b5858fd10ad296d7820bac05355d71d',
+    'bbs_fourth.hed': '8e6f5b86ada09a7c5b00c4fd1642f857',
+    'bbs_second.hed': 'e6d61ccc04fcba8ccc0e789ea53a8c02',
+    'bbs_third.hed': '2ee77e135bb1823889f05ac13c1a9d8c',
+    'kh1_fifth.hed': '4be388355d732c6f09d3c56fa6db7a2b',
+    'kh1_first.hed': '1ac0102349a74db3c1eecf91bc284cb4',
+    'kh1_fourth.hed': '0b14dda60f19fac1da50e20a408e50b8',
+    'kh1_second.hed': 'c0b6b40c041542d5afd41357e02088f9',
+    'kh1_third.hed': '4e799b35231269c525948a5815b6bcbf',
+    'kh2_fifth.hed': '1091551eaf8281f249035180663b0a2e',
+    'kh2_first.hed': '9a848ce98dc5808ded89f5fff2981f16',
+    'kh2_fourth.hed': '53ee4061566a5700a3906b939fb4daed',
+    'kh2_second.hed': 'c7020658f97efe251c50dfbca2c5a8dc',
+    'kh2_sixth.hed': 'a3c87068d13b9a4dfe181c3bb907ac5e',
+    'kh2_third.hed': '5865642b0826c55dbb143dc843adef74',
+    'kh3d_first.hed': '83892d2534c98c3b50d7aaaaf9d51889',
+    'kh3d_fourth.hed': '55ee6fbd6a025fa62bdfeb9243876202',
+    'kh3d_second.hed': '135baeac7ce2e36e52b4fbb72d7e056b',
+    'kh3d_third.hed': '71792c53ec9584198e60378a4df52a86',
+    'Mare.hed': 'f5d4a45e048f586ecbf1a71f43e8dafd'
 }
 
 import hashlib 
@@ -174,7 +197,7 @@ import hashlib
 def validChecksum(path):
     pkgname = path.split(os.sep)[-1]
     if pkgname not in checksums:
-        raise Exception("Error: PKG {} not found!".format(pkgname))
+        raise Exception("Error: Checksum for {} not found!".format(pkgname))
     checksum = hashlib.md5(open(path,'rb').read()).hexdigest()
     if not checksum == checksums[pkgname]:
         print_debug("PKG {} has changed checksum!".format(pkgname))
@@ -214,7 +237,7 @@ def main(cli_args: list = []):
             getmode = "fast_patch"
 
     main_options.add_argument("-game", choices=list(games.keys()), default=default_config.get("game"), help="Which game to operate on.", required=True)
-    main_options.add_argument("-mode", choices=["extract", "patch", "restore", "fast_patch", "fast_restore"], default=getmode, help="Which mode to run (`Patch` patches the game, `Extract` extracts the pkg files for the game, and `Restore` will restore the backed up pkg files without patching anything)", required=True)
+    main_options.add_argument("-mode", choices=["extract", "patch", "restore", "fast_patch"], default=getmode, help="Which mode to run (`Patch` patches the game, `Extract` extracts the pkg files for the game, and `Restore` will restore the backed up pkg files without patching anything)", required=True)
     #removed `uk` from region choices. uk just uses us for everything anyway aside from some journal stuff so it's not worth using ever and causes confusion in my opinion.
     main_options.add_argument("-region", choices=["jp", "us", "it", "sp", "gr", "fr"], default=default_config.get("region", ""), help="defaults to 'us', needed to make sure the correct files are patched")
 
@@ -285,8 +308,7 @@ def main(cli_args: list = []):
     #patchunknownnames = args.patchunknown
 
     backup = True if mode in ["patch", "fast_patch"] else False
-    restore = True if mode in ["patch", "restore", "fast_patch", "fast_restore"] else False
-    fastrestore = True if mode in ["fast_patch", "fast_restore"] else False
+    restore = True if mode in ["patch", "restore", "fast_patch"] else False
 
     pkgmap = json.load(open("pkgmap.json")).get(game.name, {})
     pkgmap_extras = json.load(open("pkgmap_extras.json")).get(game.name, {}) # predefined extras for patches that fail otherwise, such as GOA ROM
@@ -343,20 +365,13 @@ def main(cli_args: list = []):
         print_debug("Restoring from backup")
         if not os.path.exists("backup_pkgs"):
             raise Exception("Backup folder doesn't exist")
-        if fastrestore:
-            if gamename != "Recom" or gamename != "Movies":
-                pkgname = gamename + "_first.pkg"
-                newfn = os.path.join(PKGDIR, pkgname)
-                sourcefn = os.path.join("backup_pkgs", pkgname)
-                shutil.copy(sourcefn, newfn)
-                shutil.copy(sourcefn.split(".pkg")[0]+".hed", newfn.split(".pkg")[0]+".hed")
-        else:
-            for pkg in game.pkgs:
-                newfn = os.path.join(PKGDIR, pkg)
-                sourcefn = os.path.join("backup_pkgs", pkg)
-                # The md5 takes too long to check so don't do it when restoring (TODO maybe check the checksums against the .hed files)
-                # if not validChecksum(sourcefn) and validate_checksum:
-                #     raise Exception("Error: {} has an invalid checksum, please restore the original file and try again".format(sourcefn))
+        for pkg in game.pkgs:
+            newfn = os.path.join(PKGDIR, pkg)
+            sourcefn = os.path.join("backup_pkgs", pkg)
+            if validChecksum(newfn.split(".pkg")[0]+".hed"):
+                continue
+            else:
+                print("Restoring {}".format(pkg))
                 shutil.copy(sourcefn, newfn)
                 shutil.copy(sourcefn.split(".pkg")[0]+".hed", newfn.split(".pkg")[0]+".hed")
     if patch:
