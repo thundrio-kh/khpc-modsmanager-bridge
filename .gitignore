@@ -10,3 +10,4 @@ extractedout
 *.pycache
 config.json
 dist_old
+__pycache__
