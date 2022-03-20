@@ -40,36 +40,22 @@ class KingdomHearts2Patcher:
         self.region = region
         self.name = "kh2"
         self.pkgs = ["kh2_first.pkg", "kh2_second.pkg", "kh2_third.pkg", "kh2_fourth.pkg", "kh2_fifth.pkg", "kh2_sixth.pkg"]
-    #some of this doesn't make sense to me. why the need to translate ps2 paths to pc ones?
-    #openkh mods manager uses the extracted pc data, so wouldn't the paths in the moddire be correct already?
-    def translate_path_old(self, path):
-        if path.startswith(os.sep):
-            path = path[1:]
-        if os.sep+"jp"+os.sep in path:
-            path = path.replace(os.sep+"jp"+os.sep, os.sep+self.region+os.sep)
-        if "ard" in path:
-            if not "jp" in path and not self.region in path:
-                path = path.replace("ard"+os.sep, "ard"+os.sep+self.region+os.sep)
-        if "map" in path:
-            # maps don't have region specifier for some reason, or they split it out into two files for some reason...
-            path = path.split("map")[0]+"map"+os.sep+path.split(os.sep)[-1]
-        if path.endswith(".a.fm"):
-            path = path.replace(".a.fm", ".a.{}".format(self.region))
-        return path
-    #changed code so the ps2/jp filenames only get translated if the bfmm region for it doesn't exist already
     def translate_path(self, path, moddir):
         if path.startswith(os.sep):
             path = path[1:]
-        if not "remastered" in path:
+        #only translate paths that aren't in the raw or remastred folders
+        #this is because those paths are always only used for the PC port
+        if not path.startswith("remastered"+os.sep) or not path.startswith("raw"+os.sep):
             if os.sep+"jp"+os.sep in path:
-                #check to see if the translated path allready exists and ignore if it does
-                prepath = path.replace(os.sep+"jp"+os.sep, os.sep+self.region+os.sep)
-                PCverExists = os.path.isfile(moddir+os.sep+prepath)
-                if not PCverExists:
-                    path = prepath
+                if not ".2ld" in path:
+                    #check to see if the translated path already exists and ignore if it does
+                    prepath = path.replace(os.sep+"jp"+os.sep, os.sep+self.region+os.sep)
+                    PCverExists = os.path.isfile(moddir+os.sep+prepath)
+                    if not PCverExists:
+                        path = prepath
             if "ard" in path:
                 if path.count(os.sep) == 1:
-                    #check to see if the translated path allready exists and ignore if it does
+                    #check to see if the translated path already exists and ignore if it does
                     prepath = path.replace("ard"+os.sep, "ard"+os.sep+self.region+os.sep)
                     PCverExists = os.path.isfile(moddir+os.sep+prepath)
                     if not PCverExists:
@@ -77,13 +63,13 @@ class KingdomHearts2Patcher:
             if "map" in path:
                 if path.count(os.sep) == 2:
                 #maps don't have region specifier for some reason, or they split it out into two files for some reason...
-                    #check to see if the translated path allready exists and ignore if it does
+                    #check to see if the translated path already exists and ignore if it does
                     prepath = path.split("map")[0]+"map"+os.sep+path.split(os.sep)[-1]
                     PCverExists = os.path.isfile(moddir+os.sep+prepath)
                     if not PCverExists:
                         path = prepath
             if path.endswith(".a.fm"):
-                #check to see if the translated path allready exists and ignore if it does
+                #check to see if the translated path already exists and ignore if it does
                 prepath = path.replace(".a.fm", ".a.{}".format(self.region))
                 PCverExists = os.path.isfile(moddir+os.sep+prepath)
                 if not PCverExists:
@@ -148,6 +134,7 @@ games = {
 }
 DEFAULTREGION = "us"
 DEFAULTGAME = "kh2"
+DEFAULTMODE = "patch"
 
 old_checksums = {
     'kh2_first.pkg': 'b977794bb340dc6c7fad486940af48a4',
@@ -203,10 +190,12 @@ def main(cli_args: list = []):
 
     default_config = {
         "game": DEFAULTGAME,
+        "mode": DEFAULTMODE,
         "openkh_path": "",
         "extracted_games_path": "",
         "khgame_path": "",
-        "region": DEFAULTREGION
+        "region": DEFAULTREGION,
+        "patches_path": ""
     }
     if os.path.exists("config.json"):
         default_config = json.load(open("config.json"))
@@ -217,9 +206,15 @@ def main(cli_args: list = []):
         "Main options",
         "The main options around the mode and game to use. All required"
     )
+    
+    #fallback measure for backwards compalibility with the old config.json
+    getmode = DEFAULTMODE
+    if default_config.get("mode") is not None:
+        if "fast" in default_config.get("mode"):
+            getmode = "fast_patch"
 
     main_options.add_argument("-game", choices=list(games.keys()), default=default_config.get("game"), help="Which game to operate on.", required=True)
-    main_options.add_argument("-mode", choices=["patch", "extract", "restore"], default="patch", help="Which mode to run (`Patch` patches the game, `Extract` extracts the pkg files for the game, and `Restore` will restore the backed up pkg files without patching anything)", required=True)
+    main_options.add_argument("-mode", choices=["extract", "patch", "restore", "fast_patch", "fast_restore"], default=getmode, help="Which mode to run (`Patch` patches the game, `Extract` extracts the pkg files for the game, and `Restore` will restore the backed up pkg files without patching anything)", required=True)
     #removed `uk` from region choices. uk just uses us for everything anyway aside from some journal stuff so it's not worth using ever and causes confusion in my opinion.
     main_options.add_argument("-region", choices=["jp", "us", "it", "sp", "gr", "fr"], default=default_config.get("region", ""), help="defaults to 'us', needed to make sure the correct files are patched")
 
@@ -233,6 +228,7 @@ def main(cli_args: list = []):
     main_options.add_argument("-khgame_path", help="Path to the Kingdom Hearts game install directory.", default=default_config.get("khgame_path"), widget='DirChooser')
     main_options.add_argument("-patches_path", help="(Optional) Path to directory containing other kh2pcpatches to apply. Will be applied in alphabetical order (Mods Manager mods will be applied last).", default=default_config.get("patches_path"), widget='DirChooser')
 
+
     advanced_options = parser.add_argument_group(
         "Advanced Options",
         "Development options for the most part, if you don't know what these do then leave them alone."
@@ -240,7 +236,8 @@ def main(cli_args: list = []):
     advanced_options.add_argument("-keepkhbuild", action="store_true", default=False, help="Will keep the intermediate khbuild folder from being deleted after the patch is applied")
     advanced_options.add_argument("-ignorebadchecksum", action="store_true", default=False, help="If true, disabled backing up and restoring the original PKG files based on checksums (you probably don't want to check this option)")
     advanced_options.add_argument('-failonmissing', action="store_true", default=False, help="If true, fails when a file can't be patched to a PKG, rather than printing a warning")
-
+    #advanced_options.add_argument('-patchunknown', action="store_true", default=False, help="If true, unknown filenames will try to be patched to the game's first PKG.")
+    
     # Parse and print the results
     if cli_args:
         args = parser.parse_args(cli_args)
@@ -249,20 +246,18 @@ def main(cli_args: list = []):
 
     config_to_write = {
         "game": args.game,
+        "mode": args.mode,
         "openkh_path": args.openkh_path,
         "extracted_games_path": args.extracted_games_path,
         "khgame_path": args.khgame_path,
         "region": args.region,
-        "patches_path": args.patches_path
+        "patches_path": args.patches_path,
     }
-
     json.dump(config_to_write, open("config.json", "w"))
 
     MODDIR = os.path.join(args.openkh_path, "mod")
-
     IDXDIR = args.openkh_path
     IDXPATH = os.path.join(IDXDIR, "OpenKh.Command.IdxImg.exe")
-
 
     gamename = args.game
     if not args.game in games:
@@ -278,7 +273,8 @@ def main(cli_args: list = []):
         raise Exception("OpenKh.Command.IdxImg.exe not found")
 
     mode = args.mode
-    patch = True if mode == "patch" else False
+    patch = True if mode in ["patch", "fast_patch"] else False
+    fastpatch = True if mode == "fast_patch" else False
     extract = True if mode == "extract" else False
 
     extra_patches_dir = args.patches_path or ''
@@ -286,12 +282,15 @@ def main(cli_args: list = []):
     keepkhbuild = args.keepkhbuild
     validate_checksum = args.ignorebadchecksum
     ignoremissing = not args.failonmissing
+    #patchunknownnames = args.patchunknown
 
-    backup = True if mode in ["patch"] else False
-    restore = True if mode in ["patch", "restore"] else False
+    backup = True if mode in ["patch", "fast_patch"] else False
+    restore = True if mode in ["patch", "restore", "fast_patch", "fast_restore"] else False
+    fastrestore = True if mode in ["fast_patch", "fast_restore"] else False
 
     pkgmap = json.load(open("pkgmap.json")).get(game.name, {})
     pkgmap_extras = json.load(open("pkgmap_extras.json")).get(game.name, {}) # predefined extras for patches that fail otherwise, such as GOA ROM
+    pkgmap_blacklist = json.load(open("pkgmap_blacklist.json")).get(game.name, {}) # blacklist of bad files to replace
     pkgmap.update(pkgmap_extras)
 
     if extract:
@@ -324,18 +323,18 @@ def main(cli_args: list = []):
                 raise Exception("Extract failed")
         original_path = os.path.join("extractedout", "original")
         remastered_path = os.path.join("extractedout", "remastered")
-        if os.path.exists("remastered"):
+        if os.path.exists(remastered_path):
             shutil.move(remastered_path, os.path.join(original_path, "remastered"))
         shutil.move(original_path, args.extracted_games_path)
         os.rename(os.path.join(args.extracted_games_path, "original"), EXTRACTED_GAME_PATH)
     if backup:
-        print_debug("Backing up")
         if not os.path.exists("backup_pkgs"):
             os.makedirs("backup_pkgs")
         for pkg in game.pkgs:
             sourcefn = os.path.join(PKGDIR, pkg)
             newfn = os.path.join("backup_pkgs", pkg)
             if not os.path.exists(newfn):
+                print_debug("Backing up file: " + sourcefn)
                 if not validChecksum(sourcefn) and validate_checksum :
                     raise Exception("Error: {} has an invalid checksum, please restore the original file and try again".format(sourcefn))
                 shutil.copy(sourcefn, newfn)
@@ -344,14 +343,22 @@ def main(cli_args: list = []):
         print_debug("Restoring from backup")
         if not os.path.exists("backup_pkgs"):
             raise Exception("Backup folder doesn't exist")
-        for pkg in game.pkgs:
-            newfn = os.path.join(PKGDIR, pkg)
-            sourcefn = os.path.join("backup_pkgs", pkg)
-            # The md5 takes too long to check so don't do it when restoring (TODO maybe check the checksums against the .hed files)
-            # if not validChecksum(sourcefn) and validate_checksum:
-            #     raise Exception("Error: {} has an invalid checksum, please restore the original file and try again".format(sourcefn))
-            shutil.copy(sourcefn, newfn)
-            shutil.copy(sourcefn.split(".pkg")[0]+".hed", newfn.split(".pkg")[0]+".hed")
+        if fastrestore:
+            if gamename != "Recom" or gamename != "Movies":
+                pkgname = gamename + "_first.pkg"
+                newfn = os.path.join(PKGDIR, pkgname)
+                sourcefn = os.path.join("backup_pkgs", pkgname)
+                shutil.copy(sourcefn, newfn)
+                shutil.copy(sourcefn.split(".pkg")[0]+".hed", newfn.split(".pkg")[0]+".hed")
+        else:
+            for pkg in game.pkgs:
+                newfn = os.path.join(PKGDIR, pkg)
+                sourcefn = os.path.join("backup_pkgs", pkg)
+                # The md5 takes too long to check so don't do it when restoring (TODO maybe check the checksums against the .hed files)
+                # if not validChecksum(sourcefn) and validate_checksum:
+                #     raise Exception("Error: {} has an invalid checksum, please restore the original file and try again".format(sourcefn))
+                shutil.copy(sourcefn, newfn)
+                shutil.copy(sourcefn.split(".pkg")[0]+".hed", newfn.split(".pkg")[0]+".hed")
     if patch:
         print_debug("Patching")
         if os.path.exists("khbuild"):
@@ -365,22 +372,43 @@ def main(cli_args: list = []):
                     relfn = fn.replace(MODDIR, '')
                     relfn_trans = game.translate_path(relfn, MODDIR)
                     print_debug("Translated Filename: {}".format(relfn_trans), verbose=True)
-                    pkgs = pkgmap.get(relfn_trans, "")
+                    #raw paths are the exact same as original paths, just with the root flder being "raw" instead of "original"
+                    #so we can check against the original path instead of needing to update the pkgmap.
+                    if "raw"+os.sep in relfn_trans:
+                        pkgs = pkgmap.get(relfn_trans.replace("raw"+os.sep, ""), "")
+                    else:
+                        pkgs = pkgmap.get(relfn_trans, "")
+                    pkgsblk = pkgmap_blacklist.get(relfn_trans, "")
                     if not pkgs:
                         print_debug("WARNING: Could not find which pkg this path belongs, file not patched: {} (original path {})".format(relfn_trans, relfn))
                         if not ignoremissing:
                             raise Exception("Exiting due to warning")
                         continue
+                    if pkgsblk:
+                        print_debug("WARNING: File blacklisted, file not patched: {})".format(relfn_trans))
+                        if not ignoremissing:
+                            raise Exception("Exiting due to warning")
+                        continue
                     for pkg in pkgs:
-                    #newfn = os.path.join("khbuild", pkg, "original", relfn_trans)
-                        if "remastered" in relfn_trans:
-                            newfn = os.path.join("khbuild", pkg, relfn_trans)
-                        else:
-                            newfn = os.path.join("khbuild", pkg, "original", relfn_trans)
-                        new_basedir = os.path.dirname(newfn)
-                        if not os.path.exists(new_basedir):
-                            os.makedirs(new_basedir)
-                        shutil.copy(fn, newfn)
+                        #only patch if the file does not exist in the blacklist pkgmap.
+                        if pkg not in pkgsblk:
+                            #default
+                            pkgname = pkg
+                            #fast_patch forces the pkg name to be the first PKG for all file, if the 
+                            #gamename isn't Recom or Movies as those are only in a single PKG anyway.
+                            if fastpatch:
+                                if gamename != "Recom" or gamename != "Movies":
+                                    pkgname = gamename + "_first"
+                            #"remastered" and "raw" paths are always already in their own folders 
+                            #so no need to add the folder name to the newfn path.
+                            if "remastered"+os.sep in relfn_trans or "raw"+os.sep in relfn_trans:
+                                newfn = os.path.join("khbuild", pkgname, relfn_trans)
+                            else:
+                                newfn = os.path.join("khbuild", pkgname, "original", relfn_trans)
+                            new_basedir = os.path.dirname(newfn)
+                            if not os.path.exists(new_basedir):
+                                os.makedirs(new_basedir)
+                            shutil.copy(fn, newfn)
         other_patches = []
         if extra_patches_dir and os.path.exists(extra_patches_dir):
             other_patches = [os.path.join(extra_patches_dir,p) for p in os.listdir(extra_patches_dir) if p.endswith(".kh2pcpatch")] #TODO double check extension
@@ -394,7 +422,18 @@ def main(cli_args: list = []):
         for fn in zipped_files:
             if len(zipped_files[fn]) == 0:
                 continue
-            newfn = os.path.join("khbuild", fn)
+            #default
+            fastfn = fn
+            #extract all kh2pcpatch files to the first PKG if fast_patch is used.
+            if fastpatch:
+                if gamename != "Recom" or gamename != "Movies":
+                    if "/original/" in fn:
+                        fastfn = gamename+"_first/original/"+fn.split("/original/")[1]
+                    elif "/remastered/" in fn:
+                        fastfn = gamename+"_first/remastered/"+fn.split("/remastered/")[1]
+                    elif "/raw/" in fn:
+                        fastfn = gamename+"_first/raw/"+fn.split("/raw/")[1]
+            newfn = os.path.join("khbuild", fastfn)
             # mods manager needs to take priority
             if not os.path.exists(newfn): 
                 new_basedir = os.path.dirname(newfn)
@@ -408,6 +447,8 @@ def main(cli_args: list = []):
                 os.makedirs(os.path.join(modfolder, "remastered"))
             if not os.path.exists(os.path.join(modfolder, "original")):
                 os.makedirs(os.path.join(modfolder, "original"))
+            if not os.path.exists(os.path.join(modfolder, "raw")):
+                os.makedirs(os.path.join(modfolder, "raw"))
             if os.path.exists("pkgoutput"):
                 shutil.rmtree("pkgoutput")
             print_debug("Patching: {}".format(pkg))
@@ -415,7 +456,7 @@ def main(cli_args: list = []):
             #print_debug(IDXPATH, "hed", "patch", '"{}"'.format(pkgfile), '"modfolder"', "-o", '"{}"'.format("pkgoutput"))
             try:
                 print_debug(args, verbose=False)
-                output = subprocess.check_output(args, stderr=subprocess.STDOUT)
+                output = subprocess.check_output(args, stderr=subprocess.STDOUT).decode('utf-8').replace("\n", "")
                 print_debug(output, verbose=True)
             except subprocess.CalledProcessError as err:
                 output = err.output
@@ -425,7 +466,7 @@ def main(cli_args: list = []):
             shutil.copy(os.path.join("pkgoutput", pkg+".hed"), os.path.join(PKGDIR, pkg+".hed"))
         if not keepkhbuild:
             shutil.rmtree("khbuild")
-    print_debug("All done! Took {}s".format(time.time()-starttime))
+    print_debug("All done! Took {}s".format(round(time.time()-starttime, 2)) + " | Mode: " + mode)
 
 if __name__ == "__main__":
     import sys
