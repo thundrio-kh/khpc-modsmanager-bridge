@@ -369,8 +369,12 @@ def main(cli_args: list = []):
                 pkgname = gamename + "_first.pkg"
                 newfn = os.path.join(PKGDIR, pkgname)
                 sourcefn = os.path.join("backup_pkgs", pkgname)
-                shutil.copy(sourcefn, newfn)
-                shutil.copy(sourcefn.split(".pkg")[0]+".hed", newfn.split(".pkg")[0]+".hed")
+                if validChecksum(newfn.split(".pkg")[0]+".hed"):
+                    pass
+                else:
+                    print("Restoring {}".format(pkgname))
+                    shutil.copy(sourcefn, newfn)
+                    shutil.copy(sourcefn.split(".pkg")[0]+".hed", newfn.split(".pkg")[0]+".hed")
         else:
             for pkg in game.pkgs:
                 newfn = os.path.join(PKGDIR, pkg)
