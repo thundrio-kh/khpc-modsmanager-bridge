@@ -237,7 +237,7 @@ def main(cli_args: list = []):
             getmode = "fast_patch"
 
     main_options.add_argument("-game", choices=list(games.keys()), default=default_config.get("game"), help="Which game to operate on.", required=True)
-    main_options.add_argument("-mode", choices=["extract", "patch", "restore", "fast_patch"], default=getmode, help="Which mode to run (`Patch` patches the game, `Extract` extracts the pkg files for the game, and `Restore` will restore the backed up pkg files without patching anything)", required=True)
+    main_options.add_argument("-mode", choices=["extract", "patch", "restore", "fast_patch", "fast_restore"], default=getmode, help="Which mode to run (`Patch` patches the game, `Extract` extracts the pkg files for the game, and `Restore` will restore the backed up pkg files without patching anything)", required=True)
     #removed `uk` from region choices. uk just uses us for everything anyway aside from some journal stuff so it's not worth using ever and causes confusion in my opinion.
     main_options.add_argument("-region", choices=["jp", "us", "it", "sp", "gr", "fr"], default=default_config.get("region", ""), help="defaults to 'us', needed to make sure the correct files are patched")
 
@@ -259,7 +259,6 @@ def main(cli_args: list = []):
     advanced_options.add_argument("-keepkhbuild", action="store_true", default=False, help="Will keep the intermediate khbuild folder from being deleted after the patch is applied")
     advanced_options.add_argument("-ignorebadchecksum", action="store_true", default=False, help="If true, disabled backing up and restoring the original PKG files based on checksums (you probably don't want to check this option)")
     advanced_options.add_argument('-failonmissing', action="store_true", default=False, help="If true, fails when a file can't be patched to a PKG, rather than printing a warning")
-    #advanced_options.add_argument('-patchunknown', action="store_true", default=False, help="If true, unknown filenames will try to be patched to the game's first PKG.")
     
     # Parse and print the results
     if cli_args:
@@ -305,10 +304,10 @@ def main(cli_args: list = []):
     keepkhbuild = args.keepkhbuild
     validate_checksum = args.ignorebadchecksum
     ignoremissing = not args.failonmissing
-    #patchunknownnames = args.patchunknown
 
     backup = True if mode in ["patch", "fast_patch"] else False
-    restore = True if mode in ["patch", "restore", "fast_patch"] else False
+    restore = True if mode in ["patch", "restore", "fast_patch", "fast_restore"] else False
+    fastrestore = True if mode in ["fast_patch", "fast_restore"] else False
 
     pkgmap = json.load(open("pkgmap.json")).get(game.name, {})
     pkgmap_extras = json.load(open("pkgmap_extras.json")).get(game.name, {}) # predefined extras for patches that fail otherwise, such as GOA ROM
@@ -365,15 +364,27 @@ def main(cli_args: list = []):
         print_debug("Restoring from backup")
         if not os.path.exists("backup_pkgs"):
             raise Exception("Backup folder doesn't exist")
-        for pkg in game.pkgs:
-            newfn = os.path.join(PKGDIR, pkg)
-            sourcefn = os.path.join("backup_pkgs", pkg)
-            if validChecksum(newfn.split(".pkg")[0]+".hed"):
-                continue
-            else:
-                print("Restoring {}".format(pkg))
-                shutil.copy(sourcefn, newfn)
-                shutil.copy(sourcefn.split(".pkg")[0]+".hed", newfn.split(".pkg")[0]+".hed")
+        if fastrestore:
+            if gamename != "Recom" or gamename != "Movies":
+                pkgname = gamename + "_first.pkg"
+                newfn = os.path.join(PKGDIR, pkgname)
+                sourcefn = os.path.join("backup_pkgs", pkgname)
+                if validChecksum(newfn.split(".pkg")[0]+".hed"):
+                    pass
+                else:
+                    print("Restoring {}".format(pkgname))
+                    shutil.copy(sourcefn, newfn)
+                    shutil.copy(sourcefn.split(".pkg")[0]+".hed", newfn.split(".pkg")[0]+".hed")
+        else:
+            for pkg in game.pkgs:
+                newfn = os.path.join(PKGDIR, pkg)
+                sourcefn = os.path.join("backup_pkgs", pkg)
+                if validChecksum(newfn.split(".pkg")[0]+".hed"):
+                    continue
+                else:
+                    print("Restoring {}".format(pkg))
+                    shutil.copy(sourcefn, newfn)
+                    shutil.copy(sourcefn.split(".pkg")[0]+".hed", newfn.split(".pkg")[0]+".hed")
     if patch:
         print_debug("Patching")
         if os.path.exists("khbuild"):
